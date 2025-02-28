@@ -1,0 +1,54 @@
+library(readr)
+library(readxl)
+library(stringr)
+library(lubridate)
+library(tidyverse)
+library(dplyr)
+library(dynlm)
+library(vars)
+library(tseries)
+library(forecast)
+library(sf)
+
+# FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION
+data <- read_csv("respopagesex2024.csv", show_col_types = FALSE)
+
+population_by_area <- data %>% dplyr::select(PA, Pop) %>%
+  group_by(PA) %>% 
+  summarise(total_pop = sum(Pop)) %>%
+  arrange(desc(total_pop)) %>%
+  slice_head(n = 10)
+
+# FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA
+planning_areas <- st_read("district_and_planning_area.geojson")
+schools <- st_read("LTASchoolZone.geojson")
+
+#distance_matrix <- st_distance(geo_data_PA, geo_data_school)
+
+ggplot() +
+  geom_sf(data = planning_areas, fill = "lightblue", alpha = 0.5) +
+  geom_sf(data = schools, color = "red", size = 2) +
+  theme_minimal() +
+  ggtitle("Planning Areas and Schools in Singapore")
+
+# Transform to Singapore's standard coordinate system (SVY21, EPSG:3414)
+planning_areas <- st_transform(planning_areas, 3414)
+schools <- st_transform(schools, 3414)
+
+
+# Spatial join to count schools in each planning area
+school_counts <- planning_areas %>%
+  st_join(schools, join = st_contains) %>%  # Join schools inside planning areas
+  group_by(Planning_Area = planning_area) %>% 
+  summarise(Number_of_Schools = n()) %>%
+  ungroup()
+
+# ROW IS THE PLANNING AREAS AND COLS IS THE SCHOOL
+distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
+
+
+# FINDING THE DISTANCE TO MALLS FOR EACH OF THE PLANNING AREA
+
+
+
+

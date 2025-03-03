@@ -95,3 +95,45 @@ final_dataframe <- streets %>%
 ### EXPORT AS CSV ###
 write.csv(final_dataframe, "/Users/melaniegan/Downloads/streets_malls_school_pop.csv", row.names = FALSE)
 
+
+### FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###
+stations <- read_csv("stations.csv") %>%
+  dplyr::distinct(station_name, .keep_all = TRUE)
+
+stations <- stations %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  st_transform(3414)
+
+street_w_geom <- streets %>%
+  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
+  st_transform(3414)
+
+#DATAFRAME OF DISTANCES
+distance_from_street_to_station <- as.data.frame(st_distance(street_w_geom, stations))
+
+colnames(distance_from_street_to_station) <- paste(stations$station_name)
+distance_from_street_to_station$Street_Name <- street_w_geom$Street_name
+print(distance_from_street_to_station)
+
+distance_from_street_to_station <- distance_from_street_to_station %>% 
+  dplyr::select(Street_Name, everything())
+
+# Set <500m to be considered 'near'
+threshold <- 500
+
+### IGNORE ###
+near <- distance_from_street_to_station %>% 
+  mutate(across(2:ncol(distance_from_street_to_station), ~ as.numeric(.))) %>%  # Convert units to numeric
+  filter(across(2:ncol(distance_from_street_to_station), ~ . <= 500))
+
+
+
+
+
+
+
+
+
+
+
+

@@ -11,13 +11,12 @@ library(forecast)
 library(sf)
 
 ### FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION ###
-data <- read_csv("respopagesex2024.csv", show_col_types = FALSE)
+population <- read_csv("respopagesex2024.csv", show_col_types = FALSE)
 
 population_by_area <- data %>% dplyr::select(PA, Pop) %>%
   group_by(PA) %>% 
   summarise(total_pop = sum(Pop)) %>%
-  arrange(desc(total_pop)) %>%
-  slice_head(n = 10)
+  arrange(desc(total_pop)) 
 
 
 ### FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA ###
@@ -41,7 +40,7 @@ school_counts <- planning_areas %>%
   group_by(Planning_Area = planning_area) %>% 
   summarise(Number_of_Schools = n()) %>%
   ungroup() %>%
-  arrange(desc(Number_of_Schools))
+  arrange(desc(Number_of_Schools)) 
 
 # ROW IS THE PLANNING AREAS AND COLS IS THE SCHOOL
 distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
@@ -72,11 +71,27 @@ mall_counts <- planning_areas %>%
   group_by(Planning_Area = planning_area) %>% 
   summarise(Number_of_Malls = n()) %>%
   ungroup() %>%
-  arrange(desc(Number_of_Malls))
+  arrange(desc(Number_of_Malls)) 
+
+# Drop geometry to join them together
+mall_counts_nogeom <- st_drop_geometry(mall_counts)
+school_counts_nogeom <- st_drop_geometry(school_counts)
+
+combine_dataframe <- left_join(mall_counts_nogeom, school_counts_nogeom, by = "Planning_Area") %>%
+  mutate(Planning_Area = toupper(Planning_Area)) 
 
 
+### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE ###
+streets <- read_csv("street_name_planning_area.csv")
+
+population_by_area <- population_by_area %>%
+  mutate(PA = toupper(PA))
+
+final_dataframe <- streets %>%
+  left_join(combine_dataframe, by = "Planning_Area") %>%
+  left_join(population_by_area, by = c("Planning_Area" = "PA"))
 
 
-
-
+### EXPORT AS CSV ###
+write.csv(final_dataframe, "/Users/melaniegan/Downloads/streets_malls_school_pop.csv", row.names = FALSE)
 

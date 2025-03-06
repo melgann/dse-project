@@ -154,13 +154,13 @@ write.csv(number_of_bus_stops_near_street, "../data/number_of_bus_stops_near_str
 
 ```{r}
 total_find_missing <- left_join(coords,number_of_bus_stops_near_street, by=join_by("Street_name" == "StreetName"))
-total_find_missing_ <-total_find_missing %>%
+bus_stops <-total_find_missing %>%
   dplyr::select("Street_name", "Planning_Area", "number_of_bus_stops", "average_dist")
 
 ```
 
 ```{r}
-write.csv(total_find_missing_, "../data/number_of_bus_stops_near_street.csv")
+write.csv(bus_stops, "../data/number_of_bus_stops_near_street.csv")
 
 ```
 

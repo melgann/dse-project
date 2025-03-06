@@ -11,7 +11,7 @@ library(forecast)
 library(sf)
 
 ### FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION ###
-population <- read_csv("respopagesex2024.csv", show_col_types = FALSE)
+population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)
 
 population_by_area <- data %>% dplyr::select(PA, Pop) %>%
   group_by(PA) %>% 
@@ -20,8 +20,8 @@ population_by_area <- data %>% dplyr::select(PA, Pop) %>%
 
 
 ### FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA ###
-planning_areas <- st_read("district_and_planning_area.geojson")
-schools <- st_read("LTASchoolZone.geojson")
+planning_areas <- st_read("Raw_datasets/district_and_planning_area.geojson")
+schools <- st_read("Raw_datasets/LTASchoolZone.geojson")
 
 ggplot() +
   geom_sf(data = planning_areas, fill = "lightblue", alpha = 0.5) +
@@ -48,7 +48,7 @@ distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
 
 
 ### FINDING THE NO OF MALLS IN EACH OF THE PLANNING AREA ###
-malls <- read.csv("shopping_mall_coordinates.csv")
+malls <- read.csv("Raw_datasets/shopping_mall_coordinates.csv")
 
 # Transform the longitude and latitude to geometry?
 malls <- malls %>%
@@ -97,7 +97,7 @@ write.csv(final_dataframe, "/Users/melaniegan/Downloads/streets_malls_school_pop
 
 
 ### FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###
-stations <- read_csv("stations.csv") %>%
+stations <- read_csv("Raw_datasets/stations.csv") %>%
   dplyr::distinct(station_name, .keep_all = TRUE)
 
 stations <- stations %>%

@@ -9,11 +9,12 @@ library(vars)
 library(tseries)
 library(forecast)
 library(sf)
+library(geosphere)
 
 ### FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION ###
 population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)
 
-population_by_area <- data %>% dplyr::select(PA, Pop) %>%
+population_by_area <- population %>% dplyr::select(PA, Pop) %>%
   group_by(PA) %>% 
   summarise(total_pop = sum(Pop)) %>%
   arrange(desc(total_pop)) 
@@ -43,7 +44,7 @@ school_counts <- planning_areas %>%
   arrange(desc(Number_of_Schools)) 
 
 # ROW IS THE PLANNING AREAS AND COLS IS THE SCHOOL
-distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
+#distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
 
 
 
@@ -100,31 +101,64 @@ write.csv(final_dataframe, "/Users/melaniegan/Downloads/streets_malls_school_pop
 stations <- read_csv("Raw_datasets/stations.csv") %>%
   dplyr::distinct(station_name, .keep_all = TRUE)
 
-stations <- stations %>%
-  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
-  st_transform(3414)
 
-street_w_geom <- streets %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326) %>%
-  st_transform(3414)
+#Function to calculate distance
+calculate_distance <- function(lat1, lon1, lat2, lon2) {
+  distHaversine(c(lon1, lat1), c(lon2, lat2))
+}
 
-#DATAFRAME OF DISTANCES
-distance_from_street_to_station <- as.data.frame(st_distance(street_w_geom, stations))
+# Define the distance threshold (in meters)
+distance_threshold <- 500
 
-colnames(distance_from_street_to_station) <- paste(stations$station_name)
-distance_from_street_to_station$Street_Name <- street_w_geom$Street_name
-print(distance_from_street_to_station)
+# Initialize a list to store results
+results <- list()
 
-distance_from_street_to_station <- distance_from_street_to_station %>% 
-  dplyr::select(Street_Name, everything())
+# Loop through each street
+for (i in 1:nrow(streets)) {
+  street_name <- streets$Street_name[i]
+  street_lat <- streets$latitude[i]
+  street_lon <- streets$longitude[i]
+  
+  # Loop through each bus stop
+  for (j in 1:nrow(stations)) {
+    station_code <- stations$station_code[j]
+    station_lat <- stations$lat[j]
+    station_lon <- stations$lon[j]
+    
+    # Calculate the distance
+    distance <- calculate_distance(street_lat, street_lon, station_lat, station_lon)
+    
+    # Check if the distance is below the threshold
+    if (distance <= distance_threshold) {
+      results <- rbind(results, data.frame(
+        StreetName = street_name,
+        StationCode = station_code,
+        Distance = distance
+      ))
+    }
+  }
+}
 
-# Set <500m to be considered 'near'
-threshold <- 500
+# Convert the results to a data frame
+results_df <- as.data.frame(results)
 
-### IGNORE ###
-near <- distance_from_street_to_station %>% 
-  mutate(across(2:ncol(distance_from_street_to_station), ~ as.numeric(.))) %>%  # Convert units to numeric
-  filter(across(2:ncol(distance_from_street_to_station), ~ . <= 500))
+# Print the results
+print(results_df)
+
+number_of_mrt_near_street <- results_df %>%
+  group_by(StreetName) %>%
+  summarise(number_of_stations=n(), average_dist=sum(Distance)/n())
+
+# Get a dataframe with the street, PA, number of stations that are 'near', and their average distance
+number_of_mrt_near_street <- left_join(streets,number_of_mrt_near_street, by=join_by("Street_name" == "StreetName"))
+number_of_mrt_near_street <-number_of_mrt_near_street %>%
+  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "average_dist")
+
+#Export CSV
+#write.csv(number_of_mrt_near_street, "/Users/melaniegan/Documents/University/Y3S2/DSE3101/dse-project/Cleaned CSV Datasets/number_of_mrt_near_street.csv")
+
+
+
 
 
 

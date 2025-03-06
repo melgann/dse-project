@@ -82,7 +82,7 @@ combine_dataframe <- left_join(mall_counts_nogeom, school_counts_nogeom, by = "P
 
 
 ### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE ###
-streets <- read_csv("street_name_planning_area.csv")
+streets <- read_csv("Cleaned CSV Datasets/street_name_planning_area.csv")
 
 population_by_area <- population_by_area %>%
   mutate(PA = toupper(PA))

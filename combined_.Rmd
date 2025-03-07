@@ -1,5 +1,5 @@
 ---
-title: "Combined_Cleaned_datasets"
+title: "Combined"
 author: "YH"
 date: "2025-03-07"
 output: html_document
@@ -177,15 +177,15 @@ print(results_df)
 
 number_of_mrt_near_street <- results_df %>%
   group_by(StreetName) %>%
-  summarise(number_of_stations=n(), average_dist=sum(Distance)/n())
+  summarise(number_of_stations=n(), average_dist_mrt=sum(Distance)/n())
 
 # Get a dataframe with the street, PA, number of stations that are 'near', and their average distance
 number_of_mrt_near_street <- left_join(streets,number_of_mrt_near_street, by=join_by("Street_name" == "StreetName"))
 number_of_mrt_near_street <-number_of_mrt_near_street %>%
-  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "average_dist")
+  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "average_dist_mrt")
 
 #Export CSV
-#write.csv(number_of_mrt_near_street, "/Users/melaniegan/Documents/University/Y3S2/DSE3101/dse-project/Cleaned CSV Datasets/number_of_mrt_near_street.csv")
+write.csv(number_of_mrt_near_street, "Cleaned_Datasets/number_of_mrt_near_street.csv")
 
 
 ```
@@ -267,7 +267,7 @@ while (TRUE) {
 
 # Print the final data frame
 print(all_bus_stops)
-
+all_bus_stops_cleaned <- distinct(all_bus_stops)
 # Save the data to a CSV file
 write.csv(all_bus_stops, "Cleaned_Datasets/bus_stops.csv", row.names = FALSE)
 
@@ -328,7 +328,7 @@ print(results_df)
 ```{r}
 number_of_bus_stops_near_street <- results_df %>%
   group_by(StreetName) %>%
-  summarise(number_of_bus_stops=n(), average_dist=sum(Distance)/n())
+  summarise(number_of_bus_stops=n(), average_dist_bus=sum(Distance)/n())
 ```
 
 ```{r}
@@ -338,13 +338,87 @@ write.csv(number_of_bus_stops_near_street, "Cleaned_Datasets/number_of_bus_stops
 ```{r}
 total_find_missing <- left_join(coords,number_of_bus_stops_near_street, by=join_by("Street_name" == "StreetName"))
 bus_stops <-total_find_missing %>%
-  dplyr::select("Street_name", "Planning_Area", "number_of_bus_stops", "average_dist")
+  dplyr::select("Street_name", "Planning_Area", "number_of_bus_stops", "average_dist_bus")
 ```
 
 
 ```{r}
-write.csv(bus_stops, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+#write.csv(bus_stops, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+```
+
+```{r}
+df1 <- read.csv("Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+df2 <- read.csv("Cleaned_Datasets/rental_prices.csv")
+df3 <- read.csv("Cleaned_Datasets/streets_malls_school_pop.csv") %>%
+  dplyr:: select(Street_name, Number_of_Malls, Number_of_Schools, total_pop, longitude, latitude)
+df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
+  dplyr:: select(Street_name, number_of_stations, average_dist_mrt)
+
+```
+
+```{r}
+final_df <- df1 %>%
+  full_join(df2, by=join_by("Street_name"=="Street")) %>%
+  full_join(df3, by = "Street_name") %>%
+  full_join(df4, by = "Street_name")
 ```
 
 
+```{r}
+library(FactoMineR)
+library(factoextra)
+
+```
+
+```{r}
+df_scaled <- final_df %>%
+  dplyr::select(-c("Street_name", "Planning_Area", "X", "longitude", "latitude")) %>%
+  mutate(number_of_stations = replace(number_of_stations, is.na(number_of_stations), 0)) %>%
+  mutate(indicator_mrt = ifelse(is.na(average_dist_mrt), 0, 1)) %>%
+  mutate(average_dist_mrt = replace(average_dist_mrt, is.na(average_dist_mrt), 10000))
+
+#df_scaled <- scale(df_scaled)
+```
+
+```{r}
+max_min_normalize <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+df_normalized <- df_scaled %>%
+  mutate(across(where(is.numeric), max_min_normalize))
+
+
+
+```
+
+
+```{r}
+accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops - 0.15*df_normalized$indicator_mrt *df_normalized$average_dist_mrt
+
+
+round(accessibility_score*1000,2)
+```
+
+
+
+
+
+```{r}
+
+pca_model <- PCA(df_scaled, scale.unit = TRUE, graph = FALSE)
+
+# Get variable importance (PCA loadings)
+pca_loadings <- pca_model$var$coord
+
+# Compute absolute loadings for PC1 (most important component)
+abs_loadings <- abs(pca_loadings[,1])
+
+# Normalize to get weights summing to 1
+weights <- abs_loadings / sum(abs_loadings)
+
+# Print weights
+print(weights)
+
+```
 

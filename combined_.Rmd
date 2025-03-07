@@ -212,7 +212,7 @@ rental_prices = rental_prices  %>%
   summarise(avg_median_price=mean(price_median, na.rm=TRUE))
 
 #write csv
-write.csv(rental_prices, "rental_prices.csv", row.names = FALSE)
+write.csv(rental_prices, "Cleaned_Datasets/rental_prices.csv", row.names = FALSE)
   
 # read in planning area
 street_name_planning_area = read.csv("Cleaned_Datasets/street_name_planning_area.csv")

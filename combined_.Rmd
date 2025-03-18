@@ -350,7 +350,7 @@ bus_stops <-total_find_missing %>%
 df1 <- read.csv("Cleaned_Datasets/number_of_bus_stops_near_street.csv")
 df2 <- read.csv("Cleaned_Datasets/rental_prices.csv")
 df3 <- read.csv("Cleaned_Datasets/streets_malls_school_pop.csv") %>%
-  dplyr:: select(Street_name, Number_of_Malls, Number_of_Schools, total_pop, longitude, latitude)
+  dplyr:: select(Street_name, Number_of_Malls, Number_of_Schools, total_pop, longitude, latitude, "Planning_Area")
 df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
   dplyr:: select(Street_name, number_of_stations, average_dist_mrt)
 
@@ -358,9 +358,10 @@ df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
 
 ```{r}
 final_df <- df1 %>%
-  full_join(df2, by=join_by("Street_name"=="Street")) %>%
-  full_join(df3, by = "Street_name") %>%
-  full_join(df4, by = "Street_name")
+  full_join(df2, by=join_by("StreetName"=="Street"))%>%
+  full_join(df3, by = join_by("StreetName" == "Street_name")) %>%
+  full_join(df4, by = join_by("StreetName" == "Street_name")) %>%
+  rename("Street_name"="StreetName")
 ```
 
 

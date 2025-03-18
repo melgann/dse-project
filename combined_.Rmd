@@ -34,6 +34,10 @@ library(httr)
 library(jsonlite)
 
 ```
+```{r}
+#summary(planning_areas)
+schools
+```
 
 ## Getting Planning Areas 
 ```{r}

@@ -159,7 +159,22 @@ number_of_mrt_near_street <-number_of_mrt_near_street %>%
 
 
 
+### PASSENGER VOLUMES (TRAIN) ###
+stations <- read_csv("Raw_datasets/stations.csv") %>%
+  dplyr::select(-c("source", "comment")) %>%
+  mutate(station_pattern = paste0("\\b", station_code, "\\b"))
 
+# For each station, finding what's the total tap in and tap out during weekends and weekdays
+passenger_volume_train <- read_csv("Raw_datasets/transport_node_train_202502.csv") %>%
+  group_by(PT_CODE, DAY_TYPE) %>%
+  summarise(total_tap_in = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
+  ungroup()
+
+# Fuzzy join to join based on whether station_code is a substring of PT_CODE because some stations are on more than one line
+df <- regex_left_join(passenger_volume_train, stations, by = c("PT_CODE" = "station_pattern")) %>%
+  dplyr::distinct(total_tap_in, .keep_all = TRUE)
+
+#df <- full_join(stations, passenger_volume_train, by = c("station_code" = "PT_CODE"))
 
 
 

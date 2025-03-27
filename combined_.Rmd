@@ -9,12 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Cleaning and Exploring data
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
+### Load libraries
 ```{r libraries}
 library(readr)
 library(readxl)
@@ -23,16 +20,14 @@ library(lubridate)
 library(tidyverse)
 library(dplyr)
 library(dynlm)
-library(vars)
-library(tseries)
-library(forecast)
 library(sf)
 library(geosphere)
 library(jsonlite)
 library(geosphere)
 library(httr)
 library(jsonlite)
-
+library(FactoMineR)
+library(factoextra)
 ```
 
 
@@ -68,10 +63,6 @@ school_counts <- planning_areas %>%
   summarise(Number_of_Schools = n()) %>%
   ungroup() %>%
   arrange(desc(Number_of_Schools)) 
-
-# ROW IS THE PLANNING AREAS AND COLS IS THE SCHOOL
-#distance_matrix <- as.data.frame(st_distance(planning_areas, schools))
-
 
 
 ### FINDING THE NO OF MALLS IN EACH OF THE PLANNING AREA ###
@@ -122,10 +113,10 @@ final_dataframe <- streets %>%
 ### EXPORT AS CSV ###
 #write.csv(final_dataframe, "Cleaned_Datasets/streets_malls_school_pop.csv", row.names = FALSE)
 
-
 ```
 
-## FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###
+
+## FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS 
 
 ```{r}
 ### FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###
@@ -150,7 +141,7 @@ for (i in 1:nrow(streets)) {
   street_lat <- streets$latitude[i]
   street_lon <- streets$longitude[i]
   
-  # Loop through each bus stop
+  # Loop through each station
   for (j in 1:nrow(stations)) {
     station_code <- stations$station_code[j]
     station_lat <- stations$lat[j]
@@ -173,21 +164,18 @@ for (i in 1:nrow(streets)) {
 # Convert the results to a data frame
 results_df <- as.data.frame(results)
 
-# Print the results
-print(results_df)
-
 number_of_mrt_near_street <- results_df %>%
   group_by(StreetName) %>%
-  summarise(number_of_stations=n(), average_dist_mrt=sum(Distance)/n())
+  summarise(number_of_stations=n(), dist_to_nearest_mrt=min(Distance))
 
 # Get a dataframe with the street, PA, number of stations that are 'near', and their average distance
 number_of_mrt_near_street <- left_join(streets,number_of_mrt_near_street, by=join_by("Street_name" == "StreetName"))
+
 number_of_mrt_near_street <-number_of_mrt_near_street %>%
-  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "average_dist_mrt")
+  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "dist_to_nearest_mrt")
 
 #Export CSV
-#write.csv(number_of_mrt_near_street, "Cleaned_Datasets/number_of_mrt_near_street.csv")
-
+write.csv(number_of_mrt_near_street, "Cleaned_Datasets/number_of_mrt_near_street.csv")
 
 ```
 
@@ -214,9 +202,6 @@ rental_prices = rental_prices  %>%
 
 #write csv
 #write.csv(rental_prices, "Cleaned_Datasets/rental_prices.csv", row.names = FALSE)
-  
-# read in planning area
-street_name_planning_area = read.csv("Cleaned_Datasets/street_name_planning_area.csv")
 
 ```
 
@@ -266,10 +251,10 @@ while (TRUE) {
   skip <- skip + top
 }
 
-# Print the final data frame
-print(all_bus_stops)
+#Check if there's duplicates
 all_bus_stops_cleaned <- distinct(all_bus_stops)
-# Save the data to a CSV file
+
+### Save the data to a CSV file ###
 #write.csv(all_bus_stops, "Cleaned_Datasets/bus_stops.csv", row.names = FALSE)
 
 ```
@@ -284,10 +269,9 @@ calculate_distance <- function(lat1, lon1, lat2, lon2) {
 ```
 
 ## Calculate distance from street to Bus stops 
-
 ```{r}
 # Define the distance threshold (in meters)
-distance_threshold <- 500
+distance_threshold <- 250
 
 # Initialize a list to store results
 results <- list()
@@ -313,7 +297,6 @@ for (i in 1:nrow(coords)) {
         StreetName = street_name,
         BusStopCode = bus_stop_code,
         Distance = distance
-        Bus
       ))
     }
   }
@@ -321,58 +304,53 @@ for (i in 1:nrow(coords)) {
 
 # Convert the results to a data frame
 results_df <- as.data.frame(results)
-
-# Print the results
-print(results_df)
 ```
 
 
 ```{r}
+# Calculate the number of bus stops for each streets and 
 number_of_bus_stops_near_street <- results_df %>%
   group_by(StreetName) %>%
-  summarise(number_of_bus_stops=n(), average_dist_bus=sum(Distance)/n())
+  summarise(number_of_bus_stops=n(), dist_to_nearest_bus_stop = min(Distance))
 ```
 
 ```{r}
-#write.csv(number_of_bus_stops_near_street, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+write.csv(number_of_bus_stops_near_street, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
 ```
 
 ```{r}
 total_find_missing <- left_join(coords,number_of_bus_stops_near_street, by=join_by("Street_name" == "StreetName"))
 bus_stops <-total_find_missing %>%
-  dplyr::select("Street_name", "Planning_Area", "number_of_bus_stops", "average_dist_bus")
+  dplyr::select("Street_name", "Planning_Area", "number_of_bus_stops", "dist_to_nearest_bus_stop")
 ```
 
 
 ```{r}
-#write.csv(bus_stops, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+write.csv(bus_stops, "Cleaned_Datasets/number_of_bus_stops_near_street.csv")
 ```
 
+
+## Read in all the cleaned csv 
 ```{r}
 df1 <- read.csv("Cleaned_Datasets/number_of_bus_stops_near_street.csv")
 df2 <- read.csv("Cleaned_Datasets/rental_prices.csv")
 df3 <- read.csv("Cleaned_Datasets/streets_malls_school_pop.csv") %>%
   dplyr:: select(Street_name, Number_of_Malls, Number_of_Schools, total_pop, longitude, latitude, "Planning_Area")
 df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
-  dplyr:: select(Street_name, number_of_stations, average_dist_mrt)
+  dplyr:: select(Street_name, number_of_stations, dist_to_nearest_mrt)
 
 ```
 
+
+## Join into one dataframe
 ```{r}
 final_df <- df1 %>%
-  full_join(df2, by=join_by("StreetName"=="Street"))%>%
-  full_join(df3, by = join_by("StreetName" == "Street_name")) %>%
-  full_join(df4, by = join_by("StreetName" == "Street_name")) %>%
-  rename("Street_name"="StreetName")
+  full_join(df2, by=join_by("Street_name"== "Street"))%>%
+  full_join(df3, by = join_by("Street_name" == "Street_name")) %>%
+  full_join(df4, by = join_by("Street_name" == "Street_name")) 
 ```
 
-
-```{r}
-library(FactoMineR)
-library(factoextra)
-
-```
-
+## Scaling our dataframe using max-min 
 ```{r}
 df_scaled <- final_df %>%
   dplyr::select(-c("Street_name", "Planning_Area", "X", "longitude", "latitude")) %>%
@@ -380,10 +358,6 @@ df_scaled <- final_df %>%
   mutate(indicator_mrt = ifelse(is.na(average_dist_mrt), 0, 1)) %>%
   mutate(average_dist_mrt = replace(average_dist_mrt, is.na(average_dist_mrt), 10000))
 
-#df_scaled <- scale(df_scaled)
-```
-
-```{r}
 max_min_normalize <- function(x) {
   (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
@@ -391,20 +365,15 @@ max_min_normalize <- function(x) {
 df_normalized <- df_scaled %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
-
-
 ```
 
-
+# Our Scoring Model
 ```{r}
 accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops + 0.15*df_normalized$indicator_mrt - df_normalized$average_dist_mrt
 
 
 round(accessibility_score*1000,2)
 ```
-
-
-
 
 
 ```{r}

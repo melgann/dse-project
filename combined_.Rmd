@@ -313,6 +313,7 @@ for (i in 1:nrow(coords)) {
         StreetName = street_name,
         BusStopCode = bus_stop_code,
         Distance = distance
+        Bus
       ))
     }
   }
@@ -396,7 +397,7 @@ df_normalized <- df_scaled %>%
 
 
 ```{r}
-accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops - 0.15*df_normalized$indicator_mrt *df_normalized$average_dist_mrt
+accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops + 0.15*df_normalized$indicator_mrt - df_normalized$average_dist_mrt
 
 
 round(accessibility_score*1000,2)
@@ -423,4 +424,21 @@ weights <- abs_loadings / sum(abs_loadings)
 print(weights)
 
 ```
+
+```{r}
+#Accessibility score 
+#Number of bus stops (within 500m)
+#Average distance to bus stops 
+#Average number of MRT stops (within 500m)
+
+#Footfall 
+#Average passenger volume per MRT stop 
+#Average passenger volume per bus stop
+
+```
+
+```{r}
+
+```
+
 

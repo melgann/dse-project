@@ -10,6 +10,7 @@ library(tseries)
 library(forecast)
 library(sf)
 library(geosphere)
+library(fuzzyjoin)
 
 ### FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION ###
 population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)

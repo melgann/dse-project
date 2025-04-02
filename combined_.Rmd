@@ -404,11 +404,25 @@ print(weights)
 
 ```{r}
 #Accessibility score 
-#Number of bus stops (within 500m)
-#Average distance to bus stops 
-#Average number of MRT stops (within 500m)
+##Number of bus stops (within 250m)
+##Distance of nearest bus stop
+##Number of mrt stops (within 500m)
+##Distance of nearest mrt stop 
 
-#Footfall 
+#footfall
+##population, schools, passenger vol (weighted by inverse distance)
+
+#final model
+##accessibility score
+##footfall 
+##malls
+##rental price
+
+
+
+
+
+
 #Average passenger volume per MRT stop 
 #Average passenger volume per bus stop
 

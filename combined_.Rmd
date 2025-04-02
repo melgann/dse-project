@@ -30,6 +30,8 @@ library(jsonlite)
 #library(factoextra)
 library(geosphere)
 library(data.table)
+library(factoextra)
+
 ```
 
 
@@ -352,55 +354,97 @@ df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
 ```
 
 
-## Join into one dataframe
+## Performing PCA to obtain relevant accessibility score 
 ```{r}
-final_df <- df1 %>%
-  full_join(df2, by=join_by("Street_name"== "Street"))%>%
-  full_join(df3, by = join_by("Street_name" == "Street_name")) %>%
-  full_join(df4, by = join_by("Street_name" == "Street_name")) 
+mrt <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv")
+bus_stop <- read.csv("Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+diff_in_timing <- read.csv("Cleaned_Datasets/street_by_weighted_diff.csv") %>%
+  rename(Street_name = "Street..Destination." )
 ```
 
-## Scaling our dataframe using max-min 
+## Combining the different components of PCA for accessibility scores
 ```{r}
-df_scaled <- final_df %>%
-  dplyr::select(-c("Planning_Area.x", "Planning_Area.y", "X", "longitude", "latitude")) %>%
-  mutate(number_of_stations = replace(number_of_stations, is.na(number_of_stations), 0))
+mrt_and_bus_stops <- mrt %>%
+  full_join(bus_stop, join_by("Street_name"))  %>%
+  full_join(diff_in_timing, join_by("Street_name"))
 
+```
+
+
+## Normalising the numerical values with min-max normalisation 
+```{r}
 max_min_normalize <- function(x) {
   (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
 }
 
-df_normalized <- df_scaled %>%
+df_normalized <- mrt_and_bus_stops %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
+df_final <- df_normalized %>%
+  dplyr::select(c("number_of_stations", "dist_to_nearest_mrt", "number_of_bus_stops", "dist_to_nearest_bus_stop", "weighted_diff_sum"))
+
 ```
+
+
+## Creating a scree plot with PCA to see number of components to retain 
+```{r}
+
+pca_model <- PCA(df_final, scale.unit = TRUE, graph = FALSE)
+fviz_eig(pca_model, addlabels = TRUE, ylim = c(0, 100))
+variance_explained <- pca_model$eig[,2]  # 2nd column = % variance explained
+
+print(variance_explained)
+
+#After inspecting the variance each component contributes, we have decided to keep 3 components 
+```
+## Deriving the accessibility score 
+```{r}
+#Inspect Individual scores for each PC component 
+pca_scores <- pca_model$ind$coord[,0:3]
+
+#PC1 score is inversely related, switch the signs 
+pca_scores_<- as.data.frame(pca_scores) %>% 
+  mutate(`Dim.1`= - `Dim.1`) %>%
+  mutate(`Dim.2` = -`Dim.2`)
+
+# Convert to proportions (equate to 1). Weights are given based on the proportion of variation of value it explains. 
+weights <- c(0.602286 , 0.202268, 0.194345)  
+accessibility_score <- as.matrix(pca_scores_) %*% weights  
+
+new_df <- cbind(df_normalized, accessibility_score) %>%
+  dplyr::select("Street_name", "accessibility_score")
+
+accessibility_scores_final <- new_df %>%
+  mutate(across(where(is.numeric), max_min_normalize))
+```
+
+## Checking for correlation with each component, see whether it makes sense or not.
+```{r}
+cor_w_numstations = cor(accessibility_scores_final$accessibility_score, df_final$number_of_stations, use = "complete.obs", method = "pearson")
+cor_w_numbus_stops= cor(accessibility_scores_final$accessibility_score, df_final$number_of_bus_stops, use = "complete.obs", method = "pearson")
+cor_w_mindist_stations = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_mrt, use = "complete.obs", method = "pearson")
+cor_w_mindist_bus_stops = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_bus_stop, use = "complete.obs", method = "pearson")
+cor_w_mindist_time = cor(accessibility_scores_final$accessibility_score, df_final$weighted_diff_sum, use = "complete.obs", method = "pearson")
+
+
+print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindist_bus_stops,cor_w_mindist_time))
+
+```
+
+
+```{r}
+#write.csv(as.data.frame(accessibility_scores_final), "../Cleaned_Datasets/accessibility_scores.csv", row.names = FALSE)
+```
+
 
 # Our Scoring Model
 ```{r}
 accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops - 0.15*df_normalized$dist_to_nearest_mrt
 
-
 round(accessibility_score*1000,2)
 ```
 
 
-```{r}
-
-pca_model <- PCA(df_scaled, scale.unit = TRUE, graph = FALSE)
-
-# Get variable importance (PCA loadings)
-pca_loadings <- pca_model$var$coord
-
-# Compute absolute loadings for PC1 (most important component)
-abs_loadings <- abs(pca_loadings[,1])
-
-# Normalize to get weights summing to 1
-weights <- abs_loadings / sum(abs_loadings)
-
-# Print weights
-print(weights)
-
-```
 
 ```{r}
 #Accessibility score 
@@ -417,10 +461,6 @@ print(weights)
 ##footfall 
 ##malls
 ##rental price
-
-
-
-
 
 
 #Average passenger volume per MRT stop 

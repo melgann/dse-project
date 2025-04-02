@@ -162,7 +162,7 @@ bus_stops <-total_find_missing %>%
 ```
 
 ```{r}
-write.csv(bus_stops, "../data/number_of_bus_stops_near_street.csv")
+#write.csv(bus_stops, "../data/number_of_bus_stops_near_street.csv")
 
 ```
 
@@ -171,12 +171,18 @@ write.csv(bus_stops, "../data/number_of_bus_stops_near_street.csv")
 #cwd
 mrt <- read.csv("../Cleaned_Datasets/number_of_mrt_near_street.csv")
 bus_stop <- read.csv("../Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+diff_in_timing <- read.csv("../Cleaned_Datasets/street_by_weighted_diff.csv")
+
+
+diff_in_timing <- diff_in_timing %>%
+  rename(Street_name = "Street..Destination." )
 ```
 
 ```{r}
 
 mrt_and_bus_stops <- mrt %>%
-  full_join(bus_stop, join_by("Street_name")) 
+  full_join(bus_stop, join_by("Street_name"))  %>%
+  full_join(diff_in_timing, join_by("Street_name"))
   
 
 ```
@@ -191,7 +197,7 @@ df_normalized <- mrt_and_bus_stops %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
 df_final <- df_normalized %>%
-  dplyr::select(c("number_of_stations", "dist_to_nearest_mrt", "number_of_bus_stops", "dist_to_nearest_bus_stop"))
+  dplyr::select(c("number_of_stations", "dist_to_nearest_mrt", "number_of_bus_stops", "dist_to_nearest_bus_stop", "weighted_diff_sum"))
 
 ```
 
@@ -236,10 +242,11 @@ pca_scores <- pca_model$ind$coord[,0:3]
 
 #PC1 score is inversely related, switch the signs 
 pca_scores_<- as.data.frame(pca_scores) %>% 
-  mutate(`Dim.1`= - `Dim.1`)
+  mutate(`Dim.1`= - `Dim.1`) %>%
+  mutate(`Dim.2` = -`Dim.2`)
 
 # Convert to proportions (equate to 1). Weights are given based on the proportion of variation of value it explains. 
-weights <- c(0.5528547252, 0.23523, 0.211915)  
+weights <- c(0.602286 , 0.202268, 0.194345)  
 accessibility_score <- as.matrix(pca_scores_) %*% weights  
 
 new_df <- cbind(df_normalized, accessibility_score) %>%
@@ -255,9 +262,10 @@ cor_w_numstations = cor(accessibility_scores_final$accessibility_score, df_final
 cor_w_numbus_stops= cor(accessibility_scores_final$accessibility_score, df_final$number_of_bus_stops, use = "complete.obs", method = "pearson")
 cor_w_mindist_stations = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_mrt, use = "complete.obs", method = "pearson")
 cor_w_mindist_bus_stops = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_bus_stop, use = "complete.obs", method = "pearson")
+cor_w_mindist_time = cor(accessibility_scores_final$accessibility_score, df_final$weighted_diff_sum, use = "complete.obs", method = "pearson")
 
 
-print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindist_bus_stops))
+print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindist_bus_stops,cor_w_mindist_time))
 
 ```
 ```{r}

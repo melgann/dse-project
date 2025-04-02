@@ -29,6 +29,8 @@ library(forecast)
 library(sf)
 library(jsonlite)
 library(geosphere)
+library(FactoMineR)
+
 ```
 
 ## Including Plots
@@ -162,5 +164,103 @@ bus_stops <-total_find_missing %>%
 ```{r}
 write.csv(bus_stops, "../data/number_of_bus_stops_near_street.csv")
 
+```
+
+
+```{r}
+#cwd
+mrt <- read.csv("../Cleaned_Datasets/number_of_mrt_near_street.csv")
+bus_stop <- read.csv("../Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+```
+
+```{r}
+
+mrt_and_bus_stops <- mrt %>%
+  full_join(bus_stop, join_by("Street_name")) 
+  
+
+```
+
+
+```{r}
+max_min_normalize <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
+
+df_normalized <- mrt_and_bus_stops %>%
+  mutate(across(where(is.numeric), max_min_normalize))
+
+df_final <- df_normalized %>%
+  dplyr::select(c("number_of_stations", "dist_to_nearest_mrt", "number_of_bus_stops", "dist_to_nearest_bus_stop"))
+
+```
+
+
+
+```{r}
+pca_model <- PCA(df_final, scale.unit = TRUE, graph = FALSE)
+
+new_variables <- as.data.frame(pca_model$ind$coord)
+head(new_variables) 
+```
+```{r}
+library(factoextra)
+
+fviz_eig(pca_model, addlabels = TRUE, ylim = c(0, 100))
+
+```
+```{r}
+# Get the percentage of variance explained
+variance_explained <- pca_model$eig[,2]  # 2nd column = % variance explained
+cumulative_variance <- cumsum(variance_explained)
+
+# Print cumulative variance
+print(cumulative_variance)
+
+# Find the minimum number of PCs needed to explain 90% variance
+min(which(cumulative_variance >= 90))
+
+#Keep the first 3 PCs 
+```
+
+```{r}
+
+#Find loadings of original variable 
+pca_loadings <- pca_model$var$coord  
+print(pca_loadings)
+```
+
+```{r}
+#Inspect Individual scores for each PC component 
+pca_scores <- pca_model$ind$coord[,0:3]
+
+#PC1 score is inversely related, switch the signs 
+pca_scores_<- as.data.frame(pca_scores) %>% 
+  mutate(`Dim.1`= - `Dim.1`)
+
+# Convert to proportions (equate to 1). Weights are given based on the proportion of variation of value it explains. 
+weights <- c(0.5528547252, 0.23523, 0.211915)  
+accessibility_score <- as.matrix(pca_scores_) %*% weights  
+
+new_df <- cbind(df_normalized, accessibility_score) %>%
+  dplyr::select("Street_name", "accessibility_score")
+
+accessibility_scores_final <- new_df %>%
+  mutate(across(where(is.numeric), max_min_normalize))
+```
+
+```{r}
+#Checking for correlation with each component, see whether it makes sense or not.
+cor_w_numstations = cor(accessibility_scores_final$accessibility_score, df_final$number_of_stations, use = "complete.obs", method = "pearson")
+cor_w_numbus_stops= cor(accessibility_scores_final$accessibility_score, df_final$number_of_bus_stops, use = "complete.obs", method = "pearson")
+cor_w_mindist_stations = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_mrt, use = "complete.obs", method = "pearson")
+cor_w_mindist_bus_stops = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_bus_stop, use = "complete.obs", method = "pearson")
+
+
+print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindist_bus_stops))
+
+```
+```{r}
+#write.csv(as.data.frame(accessibility_scores_final), "../Cleaned_Datasets/accessibility_scores.csv", row.names = FALSE)
 ```
 

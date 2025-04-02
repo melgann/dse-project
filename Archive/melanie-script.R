@@ -160,25 +160,187 @@ number_of_mrt_near_street <-number_of_mrt_near_street %>%
 
 
 
+
+
+###########
+library(httr)
+library(jsonlite)
+
+# API Key
+api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+
+# API Endpoint
+url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Train"
+
+# Send Request and Get Response
+response <- GET(url, add_headers(AccountKey = api_key))
+
+# Convert JSON Response to R List
+data <- fromJSON(content(response, "text"))
+csv_url <- data$value[[1]]  # Extract the URL from JSON
+
+#print(paste("Download CSV from:", csv_url))  # Check the link
+
+# Download CSV File
+csv_file_train <- "train_passenger_volume.csv"
+download.file(csv_url, csv_file, mode = "wb")  # Download CSV file
+
+
 ### PASSENGER VOLUMES (TRAIN) ###
 stations <- read_csv("Raw_datasets/stations.csv") %>%
   dplyr::select(-c("source", "comment")) %>%
   mutate(station_pattern = paste0("\\b", station_code, "\\b"))
 
-# For each station, finding what's the total tap in and tap out during weekends and weekdays
-passenger_volume_train <- read_csv("Raw_datasets/transport_node_train_202502.csv") %>%
-  group_by(PT_CODE, DAY_TYPE) %>%
-  summarise(total_tap_in = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
+# Read in downloaded CSV file
+# For each station, finding what's the total tap in and tap out 
+passenger_volume_train <- read_csv(csv_file_train) %>%
+  group_by(PT_CODE) %>%
+  summarise(total_tap_in_mrt = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out_mrt = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
   ungroup()
 
 # Fuzzy join to join based on whether station_code is a substring of PT_CODE because some stations are on more than one line
-df <- regex_left_join(passenger_volume_train, stations, by = c("PT_CODE" = "station_pattern")) %>%
-  dplyr::distinct(total_tap_in, .keep_all = TRUE)
-
-#df <- full_join(stations, passenger_volume_train, by = c("station_code" = "PT_CODE"))
+df_train <- regex_left_join(passenger_volume_train, stations, by = c("PT_CODE" = "station_pattern")) %>%
+  dplyr::distinct(total_tap_in_mrt, .keep_all = TRUE)
 
 
 
+#################
+#Function to calculate distance
+calculate_distance <- function(lat1, lon1, lat2, lon2) {
+  distHaversine(c(lon1, lat1), c(lon2, lat2))
+}
+
+# Define the distance threshold (in meters)
+distance_threshold <- 500000
+
+# Initialize a list to store results
+results <- list()
+
+# Loop through each street
+for (i in 1:nrow(streets)) {
+  street_name <- streets$Street_name[i]
+  street_lat <- streets$latitude[i]
+  street_lon <- streets$longitude[i]
+  
+  # Loop through each station
+  for (j in 1:nrow(stations)) {
+    station_code <- stations$station_code[j]
+    station_lat <- stations$lat[j]
+    station_lon <- stations$lon[j]
+    
+    # Calculate the distance
+    distance <- calculate_distance(street_lat, street_lon, station_lat, station_lon)
+    
+    # Check if the distance is below the threshold
+    
+    results <- rbind(results, data.frame(
+      StreetName = street_name,
+      StationCode = station_code,
+      Distance = distance))
+    
+  }
+}
+
+# Convert the results to a data frame
+results_df <- as.data.frame(results)
+
+##########################
+
+dist_mrt <- results_df %>%
+  group_by(StreetName) %>%
+  summarise(dist_to_nearest_mrt=min(Distance), StationCode = StationCode[which.min(Distance)])
+
+
+# weights = 1/distance
+# create a new variable called dist_weighted_PV_bus that is a measure of footfall
+expanded_df <- df_train %>%
+  separate_rows(PT_CODE, sep = "/") %>%
+  distinct()
+
+mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "PT_CODE")) %>%
+  dplyr::select(-c("station_code", "station_pattern")) %>%
+  mutate(dist_weighted_PV_train = (1/dist_to_nearest_mrt) * total_tap_out_mrt)
+
+
+
+
+
+
+############## BUS STOPS #################################
+
+# Step 1: Set API Key
+api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+
+# Step 2: Define API Endpoint
+url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Bus"
+
+# Step 3: Send Request and Get Response
+response <- GET(url, add_headers(AccountKey = api_key))
+
+# Step 4: Convert JSON Response to R List
+data <- fromJSON(content(response, "text"))
+
+# Step 5: Extract CSV Download Link
+csv_url <- data$value[[1]]  # Extract the first URL from JSON response
+
+print(paste("Download CSV from:", csv_url))  # Check the link
+
+# Step 6: Download and Save the CSV File
+csv_file_bus <- "bus_passenger_volume.csv"  # Change path if needed
+download.file(csv_url, csv_file, mode = "wb")
+
+# Step 7: Load CSV into R
+bus_data <- read_csv(csv_file_bus) %>%
+  group_by(PT_CODE) %>%
+  summarise(total_tap_in_bus = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out_bus = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
+  ungroup()
+
+
+all_bus_stops_cleaned <- read_csv("Cleaned_Datasets/bus_stops.csv")
+
+bus_code_cood <- left_join(bus_data, all_bus_stops_cleaned, by = c("PT_CODE" = "BusStopCode"))
+
+
+##### SAME code as in combned
+# Convert to data.table 
+coords_dt <- as.data.table(coords)
+bus_stops_dt <- as.data.table(distinct(all_bus_stops_cleaned))
+
+results_list <- list()  
+
+for (i in 1:nrow(coords_dt)) {
+  street_name <- coords_dt$Street_name[i]
+  street_lat <- coords_dt$latitude[i]
+  street_lon <- coords_dt$longitude[i]
+  
+  # Vectorized distance calculation for all bus stops
+  distances <- distHaversine(
+    matrix(c(street_lon, street_lat), nrow = 1),
+    matrix(c(bus_stops_dt$Longitude, bus_stops_dt$Latitude), ncol = 2)
+  )
+  
+  # Store results in a list
+  results_list[[i]] <- data.frame(
+    StreetName = street_name,
+    BusStopCode = bus_stops_dt$BusStopCode,
+    Distance = distances
+  )
+}
+
+# Combine results 
+results_df_bus <- rbindlist(results_list)
+#############
+
+# Finding the distance to the nearest bus stop from each street
+dist_bus <- results_df_bus %>%
+  group_by(StreetName) %>%
+  summarise(dist_to_nearest_bus_stop = min(Distance, na.rm = TRUE), BusStopCode = BusStopCode[which.min(Distance)])
+
+# weights = 1/distance
+# create a new variable called dist_weighted_PV_bus that is a measure of footfall
+bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = "PT_CODE")) %>%
+  dplyr::select(-c("RoadName", "Description")) %>%
+  mutate(dist_weighted_PV_bus = (1/dist_to_nearest_bus_stop) * total_tap_out_bus)
 
 
 

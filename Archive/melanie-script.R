@@ -183,11 +183,11 @@ csv_url <- data$value[[1]]  # Extract the URL from JSON
 
 # Download CSV File
 csv_file_train <- "train_passenger_volume.csv"
-download.file(csv_url, csv_file, mode = "wb")  # Download CSV file
+download.file(csv_url, csv_file_train, mode = "wb")  # Download CSV file
 
 
 ### PASSENGER VOLUMES (TRAIN) ###
-stations <- read_csv("Raw_datasets/stations.csv") %>%
+stations <- read_csv("../Raw_datasets/stations.csv") %>%
   dplyr::select(-c("source", "comment")) %>%
   mutate(station_pattern = paste0("\\b", station_code, "\\b"))
 
@@ -287,7 +287,7 @@ print(paste("Download CSV from:", csv_url))  # Check the link
 
 # Step 6: Download and Save the CSV File
 csv_file_bus <- "bus_passenger_volume.csv"  # Change path if needed
-download.file(csv_url, csv_file, mode = "wb")
+download.file(csv_url, csv_file_bus, mode = "wb")
 
 # Step 7: Load CSV into R
 bus_data <- read_csv(csv_file_bus) %>%
@@ -296,7 +296,7 @@ bus_data <- read_csv(csv_file_bus) %>%
   ungroup()
 
 
-all_bus_stops_cleaned <- read_csv("Cleaned_Datasets/bus_stops.csv")
+all_bus_stops_cleaned <- read_csv("../Cleaned_Datasets/bus_stops.csv")
 
 bus_code_cood <- left_join(bus_data, all_bus_stops_cleaned, by = c("PT_CODE" = "BusStopCode"))
 
@@ -338,6 +338,8 @@ dist_bus <- results_df_bus %>%
 
 # weights = 1/distance
 # create a new variable called dist_weighted_PV_bus that is a measure of footfall
+
+
 bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = "PT_CODE")) %>%
   dplyr::select(-c("RoadName", "Description")) %>%
   mutate(dist_weighted_PV_bus = (1/dist_to_nearest_bus_stop) * total_tap_out_bus)
@@ -345,7 +347,53 @@ bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = 
 
 
 
+pop_and_num_schools <- read_csv("../Cleaned_Datasets/streets_malls_school_pop.csv")
+
+bus_and_mrt_tap_out <- bus_code_cood_dist %>%
+  left_join(mrt_code_cood_dist, join_by("StreetName")) %>%
+  left_join(pop_and_num_schools, join_by("StreetName" == "Street_name")) %>%
+  dplyr::select(c(dist_weighted_PV_bus, dist_weighted_PV_train, total_pop, Number_of_Schools))
+
+pca_model <- PCA(bus_and_mrt_tap_out, scale.unit = TRUE, graph = FALSE)
+fviz_eig(pca_model, addlabels = TRUE, ylim = c(0, 100))
+variance_explained <- pca_model$eig[,2]  # 2nd column = % variance explained
+
+print(variance_explained)
+
+pca_scores <- pca_model$ind$coord[,0:3]
+weights <- c(0.515, 0.27843,0.205814)  
+footfall <- as.matrix(pca_scores_) %*% weights  
+
+new_df <- cbind(df_normalized, footfall) %>%
+  dplyr::select("Street_name", "footfall")
+
+footfall_score <- new_df %>%
+  mutate(across(where(is.numeric), max_min_normalize))
+
+df1 <- read.csv("../Cleaned_Datasets/number_of_bus_stops_near_street.csv")
+df2 <- read.csv("../Cleaned_Datasets/rental_prices.csv")
+df3 <- read.csv("../Cleaned_Datasets/streets_malls_school_pop.csv") %>%
+  dplyr:: select(Street_name, Number_of_Malls, Number_of_Schools, total_pop, longitude, latitude, "Planning_Area")
+df4 <- read.csv("../Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
+  dplyr:: select(Street_name, number_of_stations, dist_to_nearest_mrt)
+
+accessibility_scores <- read.csv("../Cleaned_Datasets/accessibility_scores.csv")
+
+df_final <- df3 %>%
+  left_join(df2, join_by("Street_name" == "Street")) %>%
+  left_join(footfall_score, join_by("Street_name")) %>%
+  left_join(accessibility_scores, join_by("Street_name"))
+
+max_min_normalize <- function(x) {
+  (x - min(x, na.rm = TRUE)) / (max(x, na.rm = TRUE) - min(x, na.rm = TRUE))
+}
 
 
+df_select <- df_final %>%
+  dplyr::select(c("footfall", "Number_of_Malls", "avg_median_price", "accessibility_score", "Street_name")) %>%
+  mutate(across(where(is.numeric), max_min_normalize))
 
 
+final_score <- 0.379537954*df_select$footfall + 0.2202202202*df_select$Number_of_Malls + 0.2202202202*df_select$accessibility_score -
+  0.180418042*df_select$avg_median_price
+cbind(final_score, df_select$"Street_name")

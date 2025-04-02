@@ -175,7 +175,7 @@ diff_in_timing <- read.csv("../Cleaned_Datasets/street_by_weighted_diff.csv")
 
 
 diff_in_timing <- diff_in_timing %>%
-  rename(Street_name = "Street..Destination." )
+  rename(Street_name = "Street..Destination." ) 
 ```
 
 ```{r}
@@ -271,4 +271,7 @@ print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindis
 ```{r}
 #write.csv(as.data.frame(accessibility_scores_final), "../Cleaned_Datasets/accessibility_scores.csv", row.names = FALSE)
 ```
+
+
+
 

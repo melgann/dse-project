@@ -657,16 +657,24 @@ accessibility_scores <- read.csv("Cleaned_Datasets/accessibility_scores.csv")
 df_final <- df3 %>%
   left_join(df2, join_by("Street_name" == "Street")) %>%
   left_join(footfall_score, join_by("Street_name")) %>%
-  left_join(accessibility_scores, join_by("Street_name"))
+  left_join(accessibility_scores, join_by("Street_name")) 
 
+df_select <- df_final %>%
+  dplyr::select(c("footfall", "dist_to_nearest_mall", "avg_median_price", "accessibility_score", "Street_name")) %>%
+  mutate(across(where(is.numeric), max_min_normalize))
 ```
 
 
 # Our Scoring Model
 ```{r}
-accessibility_score <- -0.2*df_normalized$avg_median_price + 0.2*df_normalized$total_pop + 0.15*df_normalized$Number_of_Malls + 0.15*df_normalized$Number_of_Schools + 0.15*df_normalized$number_of_bus_stops - 0.15*df_normalized$dist_to_nearest_mrt
+final_score <- 0.379537954*df_select$footfall - 0.2202202202*df_select$dist_to_nearest_mall + 0.2202202202*df_select$accessibility_score -
+  0.180418042*df_select$avg_median_price
 
-round(accessibility_score*1000,2)
+
+final_scores_ <- as.data.frame(cbind(final_score, df_select$"Street_name")) %>%
+  dplyr::arrange(desc(final_score))
+
+
 ```
 
 

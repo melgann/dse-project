@@ -9,8 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-# Cleaning and Exploring data
-
 ### Load libraries
 ```{r libraries}
 library(readr)
@@ -34,8 +32,32 @@ library(factoextra)
 
 ```
 
+## Getting Street names and Rental Prices
+```{r}
+# cleaning rental dataset
+q1_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303231245.csv")
+q2_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303230811.csv")
+q3_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303230853.csv")
+q4_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303231354.csv")
+# prices are per square meter per month
 
-## Getting Planning Areas 
+rental_prices = rbind(q1_rental_og,q2_rental_og,q3_rental_og,q4_rental_og)%>%
+  rename("Quarter" = "Reference.Quarter") %>%
+  rename_with(~c("price_25%", "price_median","price_75%"), .cols=3:5) %>%
+  filter(!if_all(3:5, ~ . == "-"))  %>%
+  mutate(Quarter=str_sub(Quarter,-1,-1)) %>%
+  mutate(across(3:5, as.numeric))
+  
+#getting avergage mdeian price over 4 quarters
+rental_prices = rental_prices  %>%
+  group_by(Street) %>%
+  summarise(avg_median_price=mean(price_median, na.rm=TRUE))
+
+#write.csv(rental_prices, "Cleaned_Datasets/rental_prices.csv", row.names = FALSE)
+
+```
+## Footfall factors
+### Getting Planning Areas and population
 ```{r}
 population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)
 
@@ -44,8 +66,10 @@ population_by_area <- population %>% dplyr::select(PA, Pop) %>%
   summarise(total_pop = sum(Pop)) %>%
   arrange(desc(total_pop)) 
 
+```
 
-### FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA ###
+### FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA
+```{r}
 planning_areas <- st_read("Raw_datasets/district_and_planning_area.geojson")
 schools <- st_read("Raw_datasets/LTASchoolZone.geojson")
 
@@ -59,7 +83,6 @@ ggplot() +
 planning_areas <- st_transform(planning_areas, 3414)
 schools <- st_transform(schools, 3414)
 
-
 # Spatial join to count schools in each planning area
 school_counts <- planning_areas %>%
   st_join(schools, join = st_contains) %>%  # Join schools inside planning areas
@@ -68,57 +91,107 @@ school_counts <- planning_areas %>%
   ungroup() %>%
   arrange(desc(Number_of_Schools)) 
 
+```
+## Passenger Volume at nearest bus stop and MRT station
+### Getting Bus Stops with API
+```{r}
 
-### FINDING THE NO OF MALLS IN EACH OF THE PLANNING AREA ###
+# API endpoint and API key
+api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
+source("api_keys.R") 
+api_key = Sys.getenv("lta_datamall_key")
+
+
+# Initialize variables
+skip <- 0
+top <- 50  # Number of records per request
+all_bus_stops <- data.frame()
+
+
+while (TRUE) {
+  # Send GET request with pagination parameters
+  response <- GET(
+    api_url,
+    add_headers(AccountKey = api_key),
+    query = list(`$skip` = skip, `$top` = top)
+  )
+
+  # Check if the request was successful
+  if (http_status(response)$category != "Success") {
+    print(paste("API request failed with status:", http_status(response)$message))
+    break
+  }
+
+  # Extract and parse the JSON data
+  response_content <- content(response, "text")
+  json_data <- fromJSON(response_content)
+
+  # Append the data to the all_bus_stops data frame
+  current_bus_stops <- as.data.frame(json_data$value)
+  all_bus_stops <- rbind(all_bus_stops, current_bus_stops)
+
+  # Check if there are more records
+  if (nrow(current_bus_stops) < top) {
+    break  # Exit the loop if no more records are returned
+  }
+
+  # Update the skip value for the next request
+  skip <- skip + top
+}
+
+#Check if there's duplicates
+all_bus_stops_cleaned <- distinct(all_bus_stops)
+
+### Save the data to a CSV file ###
+#write.csv(all_bus_stops_cleaned, "Cleaned_Datasets/bus_stops.csv", row.names = FALSE)
+
+```
+
+
+
+##Malls
+### FINDING DISTANCE OF NEAREST MALL 
+```{r}
 malls <- read.csv("Raw_datasets/shopping_mall_coordinates.csv")
+coords <- read.csv("Cleaned_datasets/street_name_planning_area.csv")
 
-# Transform the longitude and latitude to geometry?
-malls <- malls %>%
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>%
-  st_transform(3414)
+# Convert to data.table 
+coords_dt <- as.data.table(coords)
+malls_dt <- as.data.table(malls)
 
-# Transform to Singapore's standard coordinate system (SVY21, EPSG:3414)
-planning_areas <- st_transform(planning_areas, 3414)
+results_list <- list()  
 
-ggplot() +
-  geom_sf(data = planning_areas, fill = "lightblue", alpha = 0.5) +
-  geom_sf(data = malls, color = "red", size = 2) +
-  theme_minimal() +
-  ggtitle("Planning Areas and Malls in Singapore")
+for (i in 1:nrow(coords_dt)) {
+  street_name <- coords_dt$Street_name[i]
+  street_lat <- coords_dt$latitude[i]
+  street_lon <- coords_dt$longitude[i]
+  
+  # Vectorized distance calculation for all malls
+  distances <- distHaversine(
+    matrix(c(street_lon, street_lat), nrow = 1),
+    matrix(c(malls_dt$LONGITUDE, malls_dt$LATITUDE), ncol = 2)
+  )
+  
+  # Store results in a list
+  results_list[[i]] <- data.frame(
+    StreetName = street_name,
+    MallName = malls_dt$Mall.Name,
+    Distance = distances
+  )
+}
 
-
-# Spatial join to count malls in each planning area
-mall_counts <- planning_areas %>%
-  st_join(malls, join = st_contains) %>%  # Join schools inside planning areas
-  group_by(Planning_Area = planning_area) %>% 
-  summarise(Number_of_Malls = n()) %>%
-  ungroup() %>%
-  arrange(desc(Number_of_Malls)) 
-
-# Drop geometry to join them together
-mall_counts_nogeom <- st_drop_geometry(mall_counts)
-school_counts_nogeom <- st_drop_geometry(school_counts)
-
-combine_dataframe <- left_join(mall_counts_nogeom, school_counts_nogeom, by = "Planning_Area") %>%
-  mutate(Planning_Area = toupper(Planning_Area)) 
+# Combine results 
+results_df_mall <- rbindlist(results_list)
 
 
-### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE ###
+### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE
 streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
 
 population_by_area <- population_by_area %>%
   mutate(PA = toupper(PA))
 
-final_dataframe <- streets %>%
-  left_join(combine_dataframe, by = "Planning_Area") %>%
-  left_join(population_by_area, by = c("Planning_Area" = "PA"))
-
-
-### EXPORT AS CSV ###
-#write.csv(final_dataframe, "Cleaned_Datasets/streets_malls_school_pop.csv", row.names = FALSE)
-
 ```
-
+##Accessibility Score
 
 ## FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS 
 ```{r}
@@ -193,89 +266,9 @@ number_of_mrt_near_street <-number_of_mrt_near_street %>%
 ```
 
 
-## Rental Prices 
-```{r}
-# cleaning rental dataset
-q1_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303231245.csv")
-q2_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303230811.csv")
-q3_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303230853.csv")
-q4_rental_og = read.csv("Raw_datasets/CommercialRentalStatsByStreet20250303231354.csv")
-# prices are per square meter per month
-
-rental_prices = rbind(q1_rental_og,q2_rental_og,q3_rental_og,q4_rental_og)%>%
-  rename("Quarter" = "Reference.Quarter") %>%
-  rename_with(~c("price_25%", "price_median","price_75%"), .cols=3:5) %>%
-  filter(!if_all(3:5, ~ . == "-"))  %>%
-  mutate(Quarter=str_sub(Quarter,-1,-1)) %>%
-  mutate(across(3:5, as.numeric))
-  
-rental_prices = rental_prices  %>%
-  group_by(Street) %>%
-  summarise(avg_median_price=mean(price_median, na.rm=TRUE))
-
-#write csv
-#write.csv(rental_prices, "Cleaned_Datasets/rental_prices.csv", row.names = FALSE)
-
-```
-
-
-
-## Getting Bus Stops with API
-```{r}
-
-# # API endpoint and API key
-# api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
-# api_key <- "oS8RIpj+SBK/tB+Hv5CHVg=="
-# 
-# # Initialize variables
-# skip <- 0
-# top <- 50  # Number of records per request
-# all_bus_stops <- data.frame()
-# 
-# 
-# while (TRUE) {
-#   # Send GET request with pagination parameters
-#   response <- GET(
-#     api_url,
-#     add_headers(AccountKey = api_key),
-#     query = list(`$skip` = skip, `$top` = top)
-#   )
-# 
-#   # Check if the request was successful
-#   if (http_status(response)$category != "Success") {
-#     print(paste("API request failed with status:", http_status(response)$message))
-#     break
-#   }
-# 
-#   # Extract and parse the JSON data
-#   response_content <- content(response, "text")
-#   json_data <- fromJSON(response_content)
-# 
-#   # Append the data to the all_bus_stops data frame
-#   current_bus_stops <- as.data.frame(json_data$value)
-#   all_bus_stops <- rbind(all_bus_stops, current_bus_stops)
-# 
-#   # Check if there are more records
-#   if (nrow(current_bus_stops) < top) {
-#     break  # Exit the loop if no more records are returned
-#   }
-# 
-#   # Update the skip value for the next request
-#   skip <- skip + top
-# }
-# 
-# #Check if there's duplicates
-# all_bus_stops_cleaned <- distinct(all_bus_stops)
-# 
-# ### Save the data to a CSV file ###
-# write.csv(all_bus_stops_cleaned, "Cleaned_Datasets/bus_stops.csv", row.names = FALSE)
-
-```
 
 ## Distance Calculation/Formula 
 ```{r}
-coords <- read.csv("Cleaned_datasets/street_name_planning_area.csv")
-
 calculate_distance <- function(lat1, lon1, lat2, lon2) {
   distHaversine(c(lon1, lat1), c(lon2, lat2))
 }

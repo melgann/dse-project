@@ -100,9 +100,9 @@ school_counts <- planning_areas %>%
 
 # API endpoint and API key
 api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
-source("api_keys.R") 
-api_key = Sys.getenv("lta_datamall_key")
-
+#source("api_keys.R") 
+#api_key = Sys.getenv("lta_datamall_key")
+api_key = "S4FSEoEgQc2BazhsvqOHjQ=="
 
 # Initialize variables
 skip <- 0
@@ -152,8 +152,8 @@ all_bus_stops_cleaned <- distinct(all_bus_stops)
 #### Obtaining Tap Out for MRT Stations 
 ```{r}
 # API Key
-#api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
-api_key <- Sys.getenv("lta_datamall_key")
+api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+#api_key <- Sys.getenv("lta_datamall_key")
 
 # API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Train"
@@ -246,8 +246,8 @@ mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "P
 #### Obtaining Tap Out rate for bus stops 
 ```{r}
 # API Key
-#api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
-api_key = Sys.getenv("lta_datamall_key")
+api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+#api_key = Sys.getenv("lta_datamall_key")
 
 # Define API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Bus"
@@ -355,6 +355,10 @@ for (i in 1:nrow(coords_dt)) {
 # Combine results 
 results_df_mall <- rbindlist(results_list)
 
+dist_mall <- results_df_mall %>%
+  group_by(StreetName) %>%
+  slice_min(order_by = Distance, with_ties = FALSE) %>%
+  ungroup()
 
 ### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE
 streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
@@ -404,9 +408,12 @@ number_of_mrt <- results_df %>%
   filter(Distance <= 500) %>%
   summarise(number_of_stations = n())
 
-dist <- results_df %>%
+dist<- results_df %>%
   group_by(StreetName) %>%
-  summarise(dist_to_nearest_mrt=min(Distance))
+  slice_min(order_by = Distance, with_ties = FALSE) %>%
+  ungroup() %>%
+  rename(dist_to_nearest_mrt = Distance) %>%
+  left_join(stations, join_by("StationCode" == "station_code"))
 
 number_of_mrt_near_street <- number_of_mrt %>% right_join(dist, by = "StreetName")
 
@@ -414,7 +421,7 @@ number_of_mrt_near_street <- number_of_mrt %>% right_join(dist, by = "StreetName
 number_of_mrt_near_street <- left_join(streets,number_of_mrt_near_street, by=join_by("Street_name" == "StreetName"))
 
 number_of_mrt_near_street <-number_of_mrt_near_street %>%
-  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "dist_to_nearest_mrt") %>%
+  dplyr::select("Street_name", "Planning_Area", "number_of_stations", "dist_to_nearest_mrt", "station_name") %>%
   mutate(across(c("number_of_stations"), ~replace_na(.x,0)))
 
 #Export CSV
@@ -463,7 +470,9 @@ number_of_bus_stops <- results_df_bus %>%
 # Finding the distance to the nearest bus stop from each street
 dist_bus <- results_df_bus %>%
   group_by(StreetName) %>%
-  summarise(dist_to_nearest_bus_stop = min(Distance, na.rm = TRUE))
+  slice_min(order_by = Distance, with_ties = FALSE) %>%
+  ungroup() %>%
+  rename(dist_to_nearest_bus_stop = Distance)
 
 number_of_bus_stops_near_street <- number_of_bus_stops %>% full_join(dist_bus, by = "StreetName")
 
@@ -586,7 +595,7 @@ df2 <- read.csv("Cleaned_Datasets/rental_prices.csv")
 df3 <- read.csv("Cleaned_Datasets/streets_malls_school_pop.csv") %>%
   dplyr:: select(Street_name, dist_to_nearest_mall, Number_of_Schools, total_pop, longitude, latitude, "Planning_Area")
 df4 <- read.csv("Cleaned_Datasets/number_of_mrt_near_street.csv") %>%
-  dplyr:: select(Street_name, number_of_stations, dist_to_nearest_mrt)
+  dplyr:: select(Street_name, number_of_stations, dist_to_nearest_mrt, station_name)
 
 
 ## Performing PCA to obtain relevant accessibility score 
@@ -664,24 +673,34 @@ accessibility_scores <- read.csv("Cleaned_Datasets/accessibility_scores.csv")
 df_final <- df3 %>%
   left_join(df2, join_by("Street_name" == "Street")) %>%
   left_join(footfall_score, join_by("Street_name")) %>%
-  left_join(accessibility_scores, join_by("Street_name")) 
+  left_join(accessibility_scores, join_by("Street_name")) %>%
+  left_join(dist_mall, join_by("Street_name" == "StreetName")) %>%
+  left_join(df1, join_by("Street_name")) %>%
+  left_join(df4, join_by("Street_name"))
+  
 
 df_select <- df_final %>%
-  dplyr::select(c("footfall", "dist_to_nearest_mall", "avg_median_price", "accessibility_score", "Street_name")) %>%
   mutate(across(where(is.numeric), max_min_normalize))
 ```
 
 
 ## 7. Our Scoring Model
 ```{r}
-final_score <- 0.379537954*df_select$footfall - 0.2202202202*df_select$dist_to_nearest_mall + 0.2202202202*df_select$accessibility_score -0.180418042*df_select$avg_median_price
+
+##Default Weightages 
+weight_footfall = 0.379537954
+weight_dist_to_nearest_mall = 0.2202202202
+weight_accessibility = 0.2202202202
+weight_rental_price = 0.180418042
+
+final_score <- weight_footfall*df_select$footfall - weight_dist_to_nearest_mall*df_select$dist_to_nearest_mall + weight_accessibility*df_select$accessibility_score - weight_rental_price*df_select$avg_median_price
 
 
-final_scores <- as.data.frame(cbind(final_score, df_select$"Street_name")) %>%
+final_scores <- as.data.frame(cbind(final_score, df_final)) %>%
+  mutate(final_score = max_min_normalize(final_score)) %>%
   dplyr::arrange(desc(final_score)) %>%
-  rename("Street_name"="V2") 
-  
-
+  dplyr::select(Street_name,final_score,Planning_Area.x, station_name, MallName, number_of_bus_stops, number_of_stations) %>%
+  rename("Planning Area" = `Planning_Area.x`)
 ```
 
 

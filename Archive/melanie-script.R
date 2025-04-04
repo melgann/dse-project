@@ -11,6 +11,8 @@ library(forecast)
 library(sf)
 library(geosphere)
 library(fuzzyjoin)
+library(data.table)
+library(factoextra)
 
 ### FINDING OUT WHICH PLANNING AREA HAS THE HIGHEST POPULATION ###
 population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)
@@ -52,50 +54,87 @@ school_counts <- planning_areas %>%
 ### FINDING THE NO OF MALLS IN EACH OF THE PLANNING AREA ###
 malls <- read.csv("Raw_datasets/shopping_mall_coordinates.csv")
 
-# Transform the longitude and latitude to geometry?
-malls <- malls %>%
-  st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>%
-  st_transform(3414)
+#### FINDING DISTANCE OF NEAREST MALL ###
 
-# Transform to Singapore's standard coordinate system (SVY21, EPSG:3414)
-planning_areas <- st_transform(planning_areas, 3414)
+# Convert to data.table 
+coords_dt <- as.data.table(coords)
+malls_dt <- as.data.table(malls)
 
-ggplot() +
-  geom_sf(data = planning_areas, fill = "lightblue", alpha = 0.5) +
-  geom_sf(data = malls, color = "red", size = 2) +
-  theme_minimal() +
-  ggtitle("Planning Areas and Malls in Singapore")
+results_list <- list()  
+
+for (i in 1:nrow(coords_dt)) {
+  street_name <- coords_dt$Street_name[i]
+  street_lat <- coords_dt$latitude[i]
+  street_lon <- coords_dt$longitude[i]
+  
+  # Vectorized distance calculation for all malls
+  distances <- distHaversine(
+    matrix(c(street_lon, street_lat), nrow = 1),
+    matrix(c(malls_dt$LONGITUDE, malls_dt$LATITUDE), ncol = 2)
+  )
+  
+  # Store results in a list
+  results_list[[i]] <- data.frame(
+    StreetName = street_name,
+    MallName = malls_dt$Mall.Name,
+    Distance = distances
+  )
+}
+
+# Combine results 
+results_df_mall <- rbindlist(results_list)
+
+# Finding the distance to the nearest bus stop from each street
+dist_mall <- results_df_mall %>%
+  group_by(StreetName) %>%
+  summarise(dist_to_nearest_mall = min(Distance, na.rm = TRUE))
 
 
-# Spatial join to count malls in each planning area
-mall_counts <- planning_areas %>%
-  st_join(malls, join = st_contains) %>%  # Join schools inside planning areas
-  group_by(Planning_Area = planning_area) %>% 
-  summarise(Number_of_Malls = n()) %>%
-  ungroup() %>%
-  arrange(desc(Number_of_Malls)) 
-
-# Drop geometry to join them together
-mall_counts_nogeom <- st_drop_geometry(mall_counts)
-school_counts_nogeom <- st_drop_geometry(school_counts)
-
-combine_dataframe <- left_join(mall_counts_nogeom, school_counts_nogeom, by = "Planning_Area") %>%
+combine_dataframe <- left_join(dist_mall, school_counts_nogeom, by = "Planning_Area") %>%
   mutate(Planning_Area = toupper(Planning_Area)) 
+
+# # Transform the longitude and latitude to geometry?
+# malls <- malls %>%
+#   st_as_sf(coords = c("LONGITUDE", "LATITUDE"), crs = 4326) %>%
+#   st_transform(3414)
+# 
+# # Transform to Singapore's standard coordinate system (SVY21, EPSG:3414)
+# planning_areas <- st_transform(planning_areas, 3414)
+# 
+# ggplot() +
+#   geom_sf(data = planning_areas, fill = "lightblue", alpha = 0.5) +
+#   geom_sf(data = malls, color = "red", size = 2) +
+#   theme_minimal() +
+#   ggtitle("Planning Areas and Malls in Singapore")
+# 
+# 
+# # Spatial join to count malls in each planning area
+# mall_counts <- planning_areas %>%
+#   st_join(malls, join = st_contains) %>%  # Join schools inside planning areas
+#   group_by(Planning_Area = planning_area) %>% 
+#   summarise(Number_of_Malls = n()) %>%
+#   ungroup() %>%
+#   arrange(desc(Number_of_Malls)) 
+# 
+# # Drop geometry to join them together
+# mall_counts_nogeom <- st_drop_geometry(mall_counts)
+# school_counts_nogeom <- st_drop_geometry(school_counts)
+
 
 
 ### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE ###
-streets <- read_csv("Cleaned CSV Datasets/street_name_planning_area.csv")
+streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
 
 population_by_area <- population_by_area %>%
   mutate(PA = toupper(PA))
 
 final_dataframe <- streets %>%
-  left_join(combine_dataframe, by = "Planning_Area") %>%
+  left_join(dist_mall, by = c("Street_name" = "StreetName")) %>%
   left_join(population_by_area, by = c("Planning_Area" = "PA"))
 
 
 ### EXPORT AS CSV ###
-write.csv(final_dataframe, "/Users/melaniegan/Downloads/streets_malls_school_pop.csv", row.names = FALSE)
+write.csv(final_dataframe, "Cleaned_Datasets/streets_malls_school_pop.csv", row.names = FALSE)
 
 
 ### FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###

@@ -118,7 +118,8 @@ combine_dataframe <- left_join(dist_mall, school_counts_nogeom, by = "Planning_A
 # 
 # # Drop geometry to join them together
 # mall_counts_nogeom <- st_drop_geometry(mall_counts)
-# school_counts_nogeom <- st_drop_geometry(school_counts)
+school_counts_nogeom <- st_drop_geometry(school_counts) %>%
+  mutate(Planning_Area = toupper(Planning_Area))
 
 
 
@@ -130,7 +131,8 @@ population_by_area <- population_by_area %>%
 
 final_dataframe <- streets %>%
   left_join(dist_mall, by = c("Street_name" = "StreetName")) %>%
-  left_join(population_by_area, by = c("Planning_Area" = "PA"))
+  left_join(population_by_area, by = c("Planning_Area" = "PA")) %>%
+  left_join(school_counts_nogeom, by = "Planning_Area")
 
 
 ### EXPORT AS CSV ###

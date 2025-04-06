@@ -136,7 +136,7 @@ final_dataframe <- streets %>%
 
 
 ### EXPORT AS CSV ###
-write.csv(final_dataframe, "Cleaned_Datasets/streets_malls_school_pop.csv", row.names = FALSE)
+#write.csv(final_dataframe, "Cleaned_Datasets/streets_malls_school_pop.csv", row.names = FALSE)
 
 
 ### FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS ###

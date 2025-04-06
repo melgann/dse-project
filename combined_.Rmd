@@ -201,33 +201,34 @@ calculate_distance <- function(lat1, lon1, lat2, lon2) {
   distHaversine(c(lon1, lat1), c(lon2, lat2))
 }
 
+streets_dt <- as.data.table(streets)
+mrt_dt <- as.data.table(distinct(stations))
+
 # Initialize a list to store results
 results <- list()
 
 # Loop through each street
-for (i in 1:nrow(streets)) {
-  street_name <- streets$Street_name[i]
-  street_lat <- streets$latitude[i]
-  street_lon <- streets$longitude[i]
+for (i in 1:nrow(streets_dt)) {
+  street_name <- streets_dt$Street_name[i]
+  street_lat <- streets_dt$lat[i]
+  street_lon <- streets_dt$lon[i]
   
-  # Loop through each station
-  for (j in 1:nrow(stations)) {
-    station_code <- stations$station_code[j]
-    station_lat <- stations$lat[j]
-    station_lon <- stations$lon[j]
-    
-    # Calculate the distance
-    distance <- calculate_distance(street_lat, street_lon, station_lat, station_lon)
-    
-    results <- rbind(results, data.frame(
-      StreetName = street_name,
-      StationCode = station_code,
-      Distance = distance))
-  }
+  # Vectorized distance calculation for all bus stops
+  distances <- distHaversine(
+    matrix(c(street_lon, street_lat), nrow = 1),
+    matrix(c(mrt_dt$lon, mrt_dt$lat), ncol = 2)
+  )
+  
+  # Store results in a list
+  results[[i]] <- data.frame(
+    StreetName = street_name,
+    StationCode = mrt_dt$station_code,
+    Distance = distances
+  )
 }
 
 # Convert the results to a data frame
-results_df_mrt <- as.data.frame(results)
+results_df_mrt <- rbindlist(results)
 
 ##########################
 
@@ -235,11 +236,9 @@ dist_mrt <- results_df_mrt %>%
   group_by(StreetName) %>%
   summarise(dist_to_nearest_mrt=min(Distance), StationCode = StationCode[which.min(Distance)])
 
-
 expanded_df <- df_train %>%
   separate_rows(PT_CODE, sep = "/") %>%
   distinct()
-
 
 # weights = 1/distance 
 # create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
@@ -319,9 +318,10 @@ dist_bus <- results_df_bus %>%
   group_by(StreetName) %>%
   summarise(dist_to_nearest_bus_stop = min(Distance, na.rm = TRUE), BusStopCode = BusStopCode[which.min(Distance)])
 
+
+
 # weights = 1/distance
 # create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
-
 bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = "PT_CODE")) %>%
   dplyr::select(-c("RoadName", "Description")) %>%
   mutate(dist_weighted_PV_bus = (1/dist_to_nearest_bus_stop) * total_tap_out_bus)

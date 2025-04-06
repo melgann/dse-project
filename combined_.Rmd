@@ -58,7 +58,8 @@ rental_prices = rental_prices  %>%
 #write.csv(rental_prices, "Cleaned_Datasets/rental_prices.csv", row.names = FALSE)
 
 ```
-## 2. Footfall factors
+
+## 2. Captive Catchment factors
 ### 2.1 Getting Planning Areas and population
 ```{r}
 population <- read_csv("Raw_datasets/respopagesex2024.csv", show_col_types = FALSE)
@@ -68,6 +69,8 @@ population_by_area <- population %>% dplyr::select(PA, Pop) %>%
   summarise(total_pop = sum(Pop)) %>%
   arrange(desc(total_pop)) 
 
+population_by_area <- population_by_area %>%
+  mutate(PA = toupper(PA))
 ```
 
 ### 2.2 FINDING THE NO OF SCHOOLS IN EACH PLANNING AREA
@@ -94,6 +97,7 @@ school_counts <- planning_areas %>%
   arrange(desc(Number_of_Schools)) 
 
 ```
+
 ### 2.3 Passenger Volume at nearest bus stop and MRT station
 #### Getting Bus Stops with API
 ```{r}
@@ -102,7 +106,7 @@ school_counts <- planning_areas %>%
 api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
 #source("api_keys.R") 
 #api_key = Sys.getenv("lta_datamall_key")
-api_key = "S4FSEoEgQc2BazhsvqOHjQ=="
+api_key = "8U4p6aBCRgKM0dBtLPuyQg=="
 
 # Initialize variables
 skip <- 0
@@ -152,7 +156,7 @@ all_bus_stops_cleaned <- distinct(all_bus_stops)
 #### Obtaining Tap Out for MRT Stations 
 ```{r}
 # API Key
-api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
 #api_key <- Sys.getenv("lta_datamall_key")
 
 # API Endpoint
@@ -170,7 +174,7 @@ csv_file_train <- "train_passenger_volume.csv"
 download.file(csv_url, csv_file_train, mode = "wb")  # Download CSV file
 
 ### PASSENGER VOLUMES (TRAIN) ###
-stations <- read_csv("Raw_datasets/stations.csv") %>%
+stations <- read_csv("Raw_datasets/stations.csv", show_col_types = FALSE) %>%
   dplyr::select(-c("source", "comment")) %>%
   mutate(station_pattern = paste0("\\b", station_code, "\\b"))
 
@@ -190,6 +194,8 @@ df_train <- regex_left_join(passenger_volume_train, stations, by = c("PT_CODE" =
 #### Finding the tap out rate for the nearest MRT station to the street 
 ```{r}
 #################
+streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv", show_col_types = FALSE)
+
 #Function to calculate distance
 calculate_distance <- function(lat1, lon1, lat2, lon2) {
   distHaversine(c(lon1, lat1), c(lon2, lat2))
@@ -221,11 +227,11 @@ for (i in 1:nrow(streets)) {
 }
 
 # Convert the results to a data frame
-results_df <- as.data.frame(results)
+results_df_mrt <- as.data.frame(results)
 
 ##########################
 
-dist_mrt <- results_df %>%
+dist_mrt <- results_df_mrt %>%
   group_by(StreetName) %>%
   summarise(dist_to_nearest_mrt=min(Distance), StationCode = StationCode[which.min(Distance)])
 
@@ -236,7 +242,7 @@ expanded_df <- df_train %>%
 
 
 # weights = 1/distance 
-# create a new variable called dist_weighted_PV_bus that is a measure of footfall
+# create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
 mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "PT_CODE")) %>%
   dplyr::select(-c("station_code", "station_pattern")) %>%
   mutate(dist_weighted_PV_train = (1/dist_to_nearest_mrt) * total_tap_out_mrt)
@@ -246,7 +252,7 @@ mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "P
 #### Obtaining Tap Out rate for bus stops 
 ```{r}
 # API Key
-api_key <- "S4FSEoEgQc2BazhsvqOHjQ=="
+api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
 #api_key = Sys.getenv("lta_datamall_key")
 
 # Define API Endpoint
@@ -272,13 +278,14 @@ bus_data <- read_csv(csv_file_bus) %>%
   ungroup()
 
 
-all_bus_stops_cleaned <- read_csv("Cleaned_Datasets/bus_stops.csv")
+all_bus_stops_cleaned <- read_csv("Cleaned_Datasets/bus_stops.csv", show_col_types = FALSE)
 
 bus_code_cood <- left_join(bus_data, all_bus_stops_cleaned, by = c("PT_CODE" = "BusStopCode"))
 ```
 
 #### Finding the tap out rate for the nearest bus stop to the street 
 ```{r}
+coords <- read.csv("Cleaned_datasets/street_name_planning_area.csv")
 coords_dt <- as.data.table(coords)
 bus_stops_dt <- as.data.table(distinct(all_bus_stops_cleaned))
 
@@ -313,7 +320,7 @@ dist_bus <- results_df_bus %>%
   summarise(dist_to_nearest_bus_stop = min(Distance, na.rm = TRUE), BusStopCode = BusStopCode[which.min(Distance)])
 
 # weights = 1/distance
-# create a new variable called dist_weighted_PV_bus that is a measure of footfall
+# create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
 
 bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = "PT_CODE")) %>%
   dplyr::select(-c("RoadName", "Description")) %>%
@@ -325,7 +332,6 @@ bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = 
 ### FINDING DISTANCE OF NEAREST MALL 
 ```{r}
 malls <- read.csv("Raw_datasets/shopping_mall_coordinates.csv")
-coords <- read.csv("Cleaned_datasets/street_name_planning_area.csv")
 
 # Convert to data.table 
 coords_dt <- as.data.table(coords)
@@ -360,55 +366,29 @@ dist_mall <- results_df_mall %>%
   slice_min(order_by = Distance, with_ties = FALSE) %>%
   ungroup()
 
-### COMBINE ALL THE DATAFRAMES WITH STREETS AND THE CORRESPONDING LANGITUDE AND LONGITUDE
-streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
+# Find the number of malls that are within 500m of each street
+number_of_malls <- results_df_mall %>%
+  group_by(StreetName) %>%
+  filter(Distance <= 500) %>%
+  summarise(number_of_malls = n())
 
-population_by_area <- population_by_area %>%
-  mutate(PA = toupper(PA))
-
+dist_mall <- dist_mall %>% 
+  left_join(number_of_malls, by = "StreetName") %>%
+  mutate(across(c("number_of_malls"), ~replace_na(.x,0)))
+  
+#write.csv(dist_mall, "Cleaned_Datasets/dist_and_no_of_malls.csv")
 ```
+
 ## 4. Accessibility Score
 
 ### 4.1 FINDING THE DISTANCE FROM THE STREET TO THE MRT STATIONS and number of MRT stations within 500m
 ```{r}
-stations <- read_csv("Raw_datasets/stations.csv") %>%
-  dplyr::distinct(station_name, .keep_all = TRUE)
-
-# Initialize a list to store results
-results <- list()
-
-# Loop through each street
-for (i in 1:nrow(streets)) {
-  street_name <- streets$Street_name[i]
-  street_lat <- streets$latitude[i]
-  street_lon <- streets$longitude[i]
-  
-  # Loop through each station
-  for (j in 1:nrow(stations)) {
-    station_code <- stations$station_code[j]
-    station_lat <- stations$lat[j]
-    station_lon <- stations$lon[j]
-    
-    # Calculate the distance
-    distance <- calculate_distance(street_lat, street_lon, station_lat, station_lon)
-  
-    results <- rbind(results, data.frame(
-    StreetName = street_name,
-    StationCode = station_code,
-    Distance = distance))
-    
-  }
-}
-
-# Convert the results to a data frame
-results_df <- as.data.frame(results)
-
-number_of_mrt <- results_df %>%
+number_of_mrt <- results_df_mrt %>%
   group_by(StreetName) %>%
   filter(Distance <= 500) %>%
   summarise(number_of_stations = n())
 
-dist<- results_df %>%
+dist<- results_df_mrt %>%
   group_by(StreetName) %>%
   slice_min(order_by = Distance, with_ties = FALSE) %>%
   ungroup() %>%
@@ -417,7 +397,7 @@ dist<- results_df %>%
 
 number_of_mrt_near_street <- number_of_mrt %>% right_join(dist, by = "StreetName")
 
-# Get a dataframe with the street, PA, number of stations that are 'near', and their minimum distance
+# Get a dataframe with the street, PA, number of stations that are 'near' (500m), and the distance of the nearest station to each street
 number_of_mrt_near_street <- left_join(streets,number_of_mrt_near_street, by=join_by("Street_name" == "StreetName"))
 
 number_of_mrt_near_street <-number_of_mrt_near_street %>%
@@ -431,35 +411,6 @@ number_of_mrt_near_street <-number_of_mrt_near_street %>%
 
 ### 4.2 FINDING THE DISTANCE FROM THE STREET TO THE Bus Stops and number of Bus Stops within 250m
 ```{r}
-all_bus_stops_cleaned <- read_csv("Cleaned_Datasets/bus_stops.csv")
-
-# Convert to data.table 
-coords_dt <- as.data.table(coords)
-bus_stops_dt <- as.data.table(distinct(all_bus_stops_cleaned))
-
-results_list <- list()  
-
-for (i in 1:nrow(coords_dt)) {
-  street_name <- coords_dt$Street_name[i]
-  street_lat <- coords_dt$latitude[i]
-  street_lon <- coords_dt$longitude[i]
-  
-  # Vectorized distance calculation for all bus stops
-  distances <- distHaversine(
-    matrix(c(street_lon, street_lat), nrow = 1),
-    matrix(c(bus_stops_dt$Longitude, bus_stops_dt$Latitude), ncol = 2)
-  )
-  
-  # Store results in a list
-  results_list[[i]] <- data.frame(
-    StreetName = street_name,
-    BusStopCode = bus_stops_dt$BusStopCode,
-    Distance = distances
-  )
-}
-
-# Combine results 
-results_df_bus <- rbindlist(results_list)
 
 # Calculate the number of bus stops for each streets that is within the threshold of 250m
 number_of_bus_stops <- results_df_bus %>%
@@ -476,7 +427,7 @@ dist_bus <- results_df_bus %>%
 
 number_of_bus_stops_near_street <- number_of_bus_stops %>% full_join(dist_bus, by = "StreetName")
 
-# Get a dataframe with the street, PA, number of stations that are 'near'
+# Get a dataframe with the street, PA, number of bus stops that are 'near' (within 250m), and the distance to the nearest bus stop from each street 
 number_of_bus_stops_near_street <- left_join(streets, number_of_bus_stops_near_street, by=join_by("Street_name" == "StreetName")) 
 
 number_of_bus_stops_near_street <-number_of_bus_stops_near_street %>%
@@ -489,7 +440,7 @@ number_of_bus_stops_near_street <-number_of_bus_stops_near_street %>%
 
 ### 4.3 Calculating the difference in time taken to DRIVE vs take PUBLIC TRANSPORT from every planning area to every street
 ```{r}
-streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
+#streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
 streets_vector <- unique(streets$Street_name)  # Get unique street names
 planning_areas_with_streets_vector <- unique(streets$Planning_Area)
 planning_areas_vector <- unique(planning_areas$planning_area) 
@@ -500,7 +451,7 @@ nobody = nobody$PA
 
 df_all_combis_drive_timing <- crossing(Planning_Area = planning_areas_vector, Street = streets_vector)
 
-drive_time = read_csv("Cleaned_Datasets/drive_timing_all.csv")
+drive_time = read_csv("Cleaned_Datasets/drive_timing.csv")
 
 df_all_combis_drive_timing = df_all_combis_drive_timing %>%
   full_join(drive_time, by=c("Planning_Area"="Planning_area", "Street"="Street_name")) %>%
@@ -550,9 +501,9 @@ street_by_weighted_diff = df_pt_vs_drive %>%
 #write.csv(street_by_weighted_diff, "street_by_weighted_diff.csv", row.names = FALSE)
 
 ```
-## 5. PCA for Footfall
+## 5. PCA for Captive Catchment
 ```{r}
-## Preparing Necessary Datasets for PCA for Footfall
+## Preparing Necessary Datasets for PCA for Captive Catchment
 
 pop_and_num_schools <- read_csv("Cleaned_Datasets/streets_malls_school_pop.csv")
 
@@ -561,17 +512,17 @@ bus_and_mrt_tap_out <- bus_code_cood_dist %>%
   left_join(pop_and_num_schools, join_by("StreetName" == "Street_name")) %>%
   dplyr::select(c(dist_weighted_PV_bus, dist_weighted_PV_train, total_pop, Number_of_Schools))
 
-## PCA model for footfall and determining the number of variable to choose
-pca_model_footfall <- PCA(bus_and_mrt_tap_out, scale.unit = TRUE, graph = FALSE)
-fviz_eig(pca_model_footfall, addlabels = TRUE, ylim = c(0, 100))
-variance_explained <- pca_model_footfall$eig[,2]  # 2nd column = % variance explained
+## PCA model for Captive Catchment and determining the number of variable to choose
+pca_model_captive_catchment <- PCA(bus_and_mrt_tap_out, scale.unit = TRUE, graph = FALSE)
+fviz_eig(pca_model_captive_catchment, addlabels = TRUE, ylim = c(0, 100))
+variance_explained <- pca_model_captive_catchment$eig[,2]  # 2nd column = % variance explained
 
 ##Choose the first 3 
 
-## Obtaining an overall footfall score from PCA 
-pca_scores_footfall <- pca_model_footfall$ind$coord[,0:3]
+## Obtaining an overall Captive Catchment score from PCA 
+pca_scores_captive_catchment <- pca_model_captive_catchment$ind$coord[,0:3]
 weights <- c(0.515, 0.27843,0.205814)  
-footfall <- as.matrix(pca_scores_footfall) %*% weights  
+captive_catchment <- as.matrix(pca_scores_captive_catchment) %*% weights  
 
 ## Maximum - minimum normalisation 
 max_min_normalize <- function(x) {
@@ -579,9 +530,9 @@ max_min_normalize <- function(x) {
 }
 
 
-## Obtaining footfall scores with normalisation
-footfall_score <- cbind(pop_and_num_schools, footfall) %>%
-  dplyr::select("Street_name", "footfall") %>%
+## Obtaining Captive Catchment scores with normalisation
+captive_catchment_score <- cbind(pop_and_num_schools, captive_catchment) %>%
+  dplyr::select("Street_name", "captive_catchment") %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
 ```
@@ -672,7 +623,7 @@ accessibility_scores <- read.csv("Cleaned_Datasets/accessibility_scores.csv")
 
 df_final <- df3 %>%
   left_join(df2, join_by("Street_name" == "Street")) %>%
-  left_join(footfall_score, join_by("Street_name")) %>%
+  left_join(captive_catchment_score, join_by("Street_name")) %>%
   left_join(accessibility_scores, join_by("Street_name")) %>%
   left_join(dist_mall, join_by("Street_name" == "StreetName")) %>%
   left_join(df1, join_by("Street_name")) %>%
@@ -688,12 +639,12 @@ df_select <- df_final %>%
 ```{r}
 
 ##Default Weightages 
-weight_footfall = 0.379537954
+weight_captive_catchment = 0.379537954
 weight_dist_to_nearest_mall = 0.2202202202
 weight_accessibility = 0.2202202202
 weight_rental_price = 0.180418042
 
-final_score <- weight_footfall*df_select$footfall - weight_dist_to_nearest_mall*df_select$dist_to_nearest_mall + weight_accessibility*df_select$accessibility_score - weight_rental_price*df_select$avg_median_price
+final_score <- weight_captive_catchment*df_select$captive_catchment - weight_dist_to_nearest_mall*df_select$dist_to_nearest_mall + weight_accessibility*df_select$accessibility_score - weight_rental_price*df_select$avg_median_price
 
 
 final_scores <- as.data.frame(cbind(final_score, df_final)) %>%

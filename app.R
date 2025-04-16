@@ -165,7 +165,7 @@ median_values <- c(
   "School Count" = median(data$`School Count`),
   "Mall Count" = median(data$`Mall Count`)
 )
-# Metric descriptions for comparison tab <- need to complete metric descriptions 
+# Metric descriptions for comparison tab
 metric_descriptions <- list(
   "Avg. Rent ($/m²/month)" = "Average monthly rental price of retail properties on street",
   "Population (in thousands)" = "Population in street's planning area",
@@ -321,12 +321,19 @@ ui <- fluidPage(
       .badge-pill-low { background-color: #dc3545; } /* Bootstrap red */
       
       .btn:disabled {
-          background-color: #e0e0e0 !important;
-          color: #888888 !important;
-          border-color: #cccccc !important;
-          cursor: not-allowed;
-          opacity: 0.65;
-        }
+        background-color: #e0e0e0 !important;
+        color: #888888 !important;
+        border-color: #cccccc !important;
+        cursor: not-allowed;
+        opacity: 0.65;
+      }
+      
+      .shiny-output-error-validation {
+        color: grey;
+        text-align: center;
+        margin-top: 20px;
+        white-space: normal;
+      }
     ")),
     
     tags$style(
@@ -402,18 +409,22 @@ ui <- fluidPage(
   ########################
   
 # ------- title and intro --------- #
-      
-  titlePanel("StreetSwiper"),
-  
-  # Block with description text and "More Details" button in the same row
   div(
-    tags$p("Discover the most strategic location to start your business with our smart scoring system.",
-           style = "font-size:16px; color: #555; margin-bottom: 2px; display: inline-block;"),
+    style = "display: flex; align-items: flex-end; margin-bottom: 20px;",
+
+    tags$img(
+      src = "logo.png",
+      alt = "StreetSwiper Logo",
+      style = "max-height: 100px; margin-right: 25px;"
+    ),
     
-    # Add "More Details" button right after the description text
-    actionButton("toggle_button", "More Details", 
-                 style = "font-size:16px; color: #007bff; border: none; background: none; cursor: pointer; display: inline-block; margin-bottom: 2px;")
-  ),
+    tags$div(
+      style = "font-size: 16px; font-weight: 500; line-height: 1.5;",
+      HTML("Discover the most strategic location to start your business.<br>"),
+      span("Make smarter decisions with our smart scoring system."),
+      actionLink("toggle_button", "More Details", style = "color: #007bff; font-weight: 400; margin-left: 6px;")
+    )
+  ),  
 
 # ----------- side bar panel --------------- #
   
@@ -475,7 +486,10 @@ ui <- fluidPage(
           
           checkboxGroupInput(
             inputId = "variableSelectionFilter", 
-            label = "Select Metrics to Compare:",
+            label = tagList(
+              h3("Select Metrics to Compare", style = "margin-top: 0px;"),
+              uiOutput("variableSelectionFilterDeactivatedMessage")
+            ),
             choices = list("Rental Price ($ per m²)" = "Avg. Rent ($/m²/month)",
                            "Population (in thousands)" = "Population (in thousands)",
                            "MRT Count" = "MRT Count",
@@ -489,10 +503,10 @@ ui <- fluidPage(
                          "School Count",
                          "Mall Count")
           ),
-          # button to toggle between 2-street  and 3-street comparison
+
           actionButton("toggleThirdStreet", label = "+ Add Street", class = "btn btn-outline-primary", width = "150px"),
           
-          uiOutput("tooFewStreetsMsg"),
+          uiOutput("toggleThirdStreetDeactivatedMessage"),
           
           tags$hr(),
           
@@ -534,7 +548,7 @@ ui <- fluidPage(
         condition = "input.mainTabs == 'Map' || input.mainTabs == 'Table'",
         
         div(
-          style = "border: 1px solid #ccc; padding: 10px; border-radius: 5px; margin-bottom: 10px; background-color: #f0f3ff;",
+          style = "border: 1px solid #ccc; padding: 10px; border-radius: 5px; background-color: #f0f3ff;",
           
           h3("Our Scoring System", style = "color: #001675; margin-top: 0px;"),
           
@@ -545,7 +559,7 @@ ui <- fluidPage(
                  style = "font-size: 13px; color: #555; margin-bottom: 10px;"),
           
           # Checkbox and info icon in the same row
-          tags$div(style = "display: flex; align-items: center; gap: 8px; margin-bottom: 10px;",
+          tags$div(style = "display: flex; align-items: center; gap: 8px; margin-bottom: 0px; padding-bottom: 0px;",
                    checkboxInput("useCustomWeights", 
                                  label = "I want to adjust the scores based on my preferences", 
                                  value = FALSE),
@@ -628,7 +642,11 @@ ui <- fluidPage(
              tabPanel(
                "Comparison", 
                uiOutput("streetPickerRow"),
-               fluidRow(uiOutput("comparisonDetails"))
+               
+               div(
+                 style = "height: 600px; overflow-y: auto;",
+                 fluidRow(uiOutput("comparisonDetails"))
+               )
              )
       
           )
@@ -700,10 +718,11 @@ server <- function(input, output, session) {
               </ul>
             </li>
           </ul>
+        </ol>
           
-          <p>&nbsp;</p> <!-- Empty line -->
+        <p>&nbsp;</p> <!-- Empty line -->
           
-          <p>Each variable is influenced by a set of detailed factors to provide a more accurate and localized analysis. The scoring is calculated by multiplying each variable by its assigned weight, giving users a clear and customized ranking of potential locations.</p>
+        <p>Each variable is influenced by a set of detailed factors to provide a more accurate and localized analysis. The scoring is calculated by multiplying each variable by its assigned weight, giving users a clear and customized ranking of potential locations.</p>
         </div>"
       ),
       size = "m",  # Medium-sized pop-up
@@ -852,7 +871,7 @@ server <- function(input, output, session) {
     
     if (!(is.null(input$planningAreaFilter) & is.null(input$regionFilter)) &
         nrow(filtered_data) > 0)
-      tags$p("Sorted by score (highest to lowest)")
+      tags$p(paste(nrow(filtered_data), "Streets · Sorted by score (highest to lowest)"))
   })
   
   output$filteredStreets <- renderUI({
@@ -1023,6 +1042,16 @@ server <- function(input, output, session) {
     )
   })
   
+  # number of saved_streets output
+  output$numberOfSavedStreets <- renderUI({
+    num <- length(saved_streets())
+    if (num == 1) {
+      tags$p("1 street saved")
+    } else if (num > 1) {
+      tags$p(paste(num, "streets saved"))
+    }
+  })
+  
   ## -------------- table output -------------- ##
   
   output$table <- renderDT({
@@ -1084,6 +1113,25 @@ server <- function(input, output, session) {
   
   outputOptions(output, "showThirdStreet", suspendWhenHidden = FALSE)
   
+  observe({
+    toggle_state <- length(saved_streets()) >= 3
+    shinyjs::toggleState("toggleThirdStreet", condition = toggle_state)
+  })
+  
+  observeEvent(saved_streets(), {
+    if (length(saved_streets()) < 3 && rv$showThirdStreet) {
+      rv$showThirdStreet <- FALSE
+      updateActionButton(session, "toggleThirdStreet", label = "+ Add Street")
+    }
+  })
+  
+  output$toggleThirdStreetDeactivatedMessage <- renderUI({
+    if (length(saved_streets()) < 3) {
+      tags$p("Please save at least 3 streets in the 'Map' tab to add a third street for comparison.", 
+             style = "color: grey; margin-top: 5px;")
+    }
+  })
+  
   ## -------------- streetPickerRow output -------------- ##
   
   output$streetPickerRow <- renderUI({
@@ -1102,22 +1150,27 @@ server <- function(input, output, session) {
     if (rv$showThirdStreet) {
       fluidRow(
         column(4, align = "center",
-               pickerInput("street1", "Street 1", choices = choices_1_2, selected = selected1,
+               pickerInput("street1", h4("Street 1", style = "margin-top: 10px;"),
+                           choices = choices_1_2, selected = selected1,
                            options = pickerOptions(container = "body", title = "Select", liveSearch = TRUE))),
         column(4, align = "center",
-               pickerInput("street2", "Street 2", choices = choices_1_2, selected = selected2,
+               pickerInput("street2", h4("Street 2", style = "margin-top: 10px;"),
+                           choices = choices_1_2, selected = selected2,
                            options = pickerOptions(container = "body", title = "Select", liveSearch = TRUE))),
         column(4, align = "center",
-               pickerInput("street3", "Street 3", choices = choices_3, selected = selected3,
+               pickerInput("street3", h4("Street 3", style = "margin-top: 10px;"),
+                           choices = choices_3, selected = selected3,
                            options = pickerOptions(container = "body", title = "Select", liveSearch = TRUE)))
       )
     } else {
       fluidRow(
         column(6, align = "center",
-               pickerInput("street1", "Street 1", choices = choices_1_2, selected = selected1,
+               pickerInput("street1", h4("Street 1", style = "margin-top: 10px;"),
+                           choices = choices_1_2, selected = selected1,
                            options = pickerOptions(container = "body", title = "Select", liveSearch = TRUE))),
         column(6, align = "center",
-               pickerInput("street2", "Street 2", choices = choices_1_2, selected = selected2,
+               pickerInput("street2", h4("Street 2", style = "margin-top: 10px;"),
+                           choices = choices_1_2, selected = selected2,
                            options = pickerOptions(container = "body", title = "Select", liveSearch = TRUE)))
       )
     }
@@ -1135,20 +1188,45 @@ server <- function(input, output, session) {
     )
   })
   
+  observe({
+    if (length(saved_streets()) < 2) {
+      shinyjs::disable("variableSelectionFilter")
+    } else {
+      shinyjs::enable("variableSelectionFilter")
+    }
+  })
+  
+  output$variableSelectionFilterDeactivatedMessage <- renderUI({
+    if (length(saved_streets()) < 2) {
+      tags$p("Please save at least 2 streets in the 'Map' tab to enable this section.", 
+             style = "color: grey; font-weight: 400; margin-top: 5px;")
+    }
+  })
+  
   ## -------------- comparisonDetails output -------------- ##
   
   output$comparisonDetails <- renderUI({
     
     req(input$street1, input$street2, input$variableSelectionFilter)
     
-    if (input$street1 == input$street2) {
-      validate("Please select 2 different streets.")
-    }
-    
     if (isTRUE(rv$showThirdStreet)) {
-      if (input$street3 == input$street1 || input$street3 == input$street2 || input$street1 == input$street2) {
-        validate("Please select 3 different streets.")
-      }
+      req(input$street3)
+      
+      validate(
+        need(
+          input$street1 != input$street2 &&
+            input$street1 != input$street3 &&
+            input$street2 != input$street3,
+          "Please select 3 different streets."
+        )
+      )
+    } else {
+      validate(
+        need(
+          input$street1 != input$street2,
+          "Please select 2 different streets."
+        )
+      )
     }
     
     metrics <- input$variableSelectionFilter
@@ -1244,35 +1322,6 @@ server <- function(input, output, session) {
     })
     
     do.call(tagList, args = ui_list)
-  })
-  
-  observe({
-    toggle_state <- length(saved_streets()) >= 3
-    shinyjs::toggleState("toggleThirdStreet", condition = toggle_state)
-  })
-  
-  observeEvent(saved_streets(), {
-    if (length(saved_streets()) < 3 && rv$showThirdStreet) {
-      rv$showThirdStreet <- FALSE
-      updateActionButton(session, "toggleThirdStreet", label = "+ Add Street")
-    }
-  })
-  
-  output$tooFewStreetsMsg <- renderUI({
-    if (length(saved_streets()) < 3) {
-      tags$p("Please save at least 3 streets in the 'Map' tab to add a third street for comparison.", 
-             style = "color: grey; margin-top: 5px;")
-    }
-  })
-  
-  output$numberOfSavedStreets <- renderUI({
-    num <- length(saved_streets())
-    
-    if (num == 1) {
-      tags$p("1 street saved")
-    } else if (num > 1) {
-      tags$p(paste(num, "streets saved"))
-    }
   })
   
 }

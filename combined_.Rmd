@@ -393,6 +393,7 @@ dist<- results_df_mrt %>%
   slice_min(order_by = Distance, with_ties = FALSE) %>%
   ungroup() %>%
   rename(dist_to_nearest_mrt = Distance) %>%
+  mutate(inversed_dist_to_nearest_mrt = 1/dist_to_nearest_mrt) %>%
   left_join(stations, join_by("StationCode" == "station_code"))
 
 number_of_mrt_near_street <- number_of_mrt %>% right_join(dist, by = "StreetName")
@@ -423,7 +424,8 @@ dist_bus <- results_df_bus %>%
   group_by(StreetName) %>%
   slice_min(order_by = Distance, with_ties = FALSE) %>%
   ungroup() %>%
-  rename(dist_to_nearest_bus_stop = Distance)
+  rename(dist_to_nearest_bus_stop = Distance)%>%
+  mutate(inversed_dist_to_nearest_bus_stop = 1/dist_to_nearest_bus_stop)
 
 number_of_bus_stops_near_street <- number_of_bus_stops %>% full_join(dist_bus, by = "StreetName")
 
@@ -567,7 +569,7 @@ df_normalized <- mrt_and_bus_stops %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
 df_final <- df_normalized %>%
-  dplyr::select(c("number_of_stations", "dist_to_nearest_mrt", "number_of_bus_stops", "dist_to_nearest_bus_stop", "weighted_diff_sum"))
+  dplyr::select(c("number_of_stations", "inversed_dist_to_nearest_mrt", "number_of_bus_stops", "inversed_dist_to_nearest_bus_stop", "weighted_diff_sum"))
 
 
 ## Creating a scree plot with PCA to see number of components to retain

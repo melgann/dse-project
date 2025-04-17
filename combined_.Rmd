@@ -445,7 +445,7 @@ number_of_bus_stops_near_street <-number_of_bus_stops_near_street %>%
 #streets <- read_csv("Cleaned_Datasets/street_name_planning_area.csv")
 streets_vector <- unique(streets$Street_name)  # Get unique street names
 planning_areas_with_streets_vector <- unique(streets$Planning_Area)
-planning_areas_vector <- unique(planning_areas$planning_area) 
+planning_areas_vector <- unique(population_by_area$PA) 
 
 nobody = population_by_area %>%
   filter(total_pop==0)
@@ -453,14 +453,16 @@ nobody = nobody$PA
 
 df_all_combis_drive_timing <- crossing(Planning_Area = planning_areas_vector, Street = streets_vector)
 
-drive_time = read_csv("Cleaned_Datasets/drive_timing.csv")
+drive_time = read_csv("Cleaned_Datasets/drive_timing_all.csv") %>%
+  mutate(Planning_area=toupper(Planning_area)) %>%
+  filter(!Planning_area %in% nobody)
 
 df_all_combis_drive_timing = df_all_combis_drive_timing %>%
-  full_join(drive_time, by=c("Planning_Area"="Planning_area", "Street"="Street_name")) %>%
-  filter(!Planning_Area %in% nobody)
-
+  right_join(drive_time, by=c("Planning_Area"="Planning_area", "Street"="Street_name"))
+  
 #pt timing
-df_all_combis_pt_timing = read.csv("Cleaned_Datasets/final_public_transport_to_streets_from_planning_area.csv")
+df_all_combis_pt_timing = read.csv("Cleaned_Datasets/final_public_transport_to_streets_from_planning_area.csv")%>%
+  mutate(Planning_area = toupper(Planning_area))
 
 #diff between pt and drive
 df_drive_timing = df_all_combis_drive_timing %>%
@@ -489,7 +491,7 @@ df_pt_vs_drive = df_pt_vs_drive %>%
   left_join(population_by_area, by = c("Residential Planning Area (Origin)"="PA"))%>%
   select(1,2,3, total_pop, everything()) 
 
-#weighted diffs
+#weighted diffs where diffs with origins with larger population get penalised more
 df_pt_vs_drive = df_pt_vs_drive %>%
   group_by(`Street (Destination)`) %>%
   mutate(weight = total_pop / sum(total_pop)) %>%
@@ -498,9 +500,10 @@ df_pt_vs_drive = df_pt_vs_drive %>%
 
 street_by_weighted_diff = df_pt_vs_drive %>%
   group_by(`Street (Destination)`) %>%
-  summarise(weighted_diff_sum = sum(weighted_diff))
+  summarise(inversed_weighted_diff_sum = 1/(sum(weighted_diff)))
   
-#write.csv(street_by_weighted_diff, "street_by_weighted_diff.csv", row.names = FALSE)
+#write.csv(street_by_weighted_diff, "Cleaned_Datasets/street_by_weighted_diff.csv", row.names = FALSE)
+
 
 ```
 ## 5. PCA for Captive Catchment
@@ -523,7 +526,7 @@ variance_explained <- pca_model_captive_catchment$eig[,2]  # 2nd column = % vari
 
 ## Obtaining an overall Captive Catchment score from PCA 
 pca_scores_captive_catchment <- pca_model_captive_catchment$ind$coord[,0:3]
-weights <- c(0.515, 0.27843,0.205814)  
+weights <- c(0.51467, 0.27907,0.20627)  
 captive_catchment <- as.matrix(pca_scores_captive_catchment) %*% weights  
 
 ## Maximum - minimum normalisation 
@@ -569,7 +572,7 @@ df_normalized <- mrt_and_bus_stops %>%
   mutate(across(where(is.numeric), max_min_normalize))
 
 df_final <- df_normalized %>%
-  dplyr::select(c("number_of_stations", "inversed_dist_to_nearest_mrt", "number_of_bus_stops", "inversed_dist_to_nearest_bus_stop", "weighted_diff_sum"))
+  dplyr::select(c("number_of_stations", "inversed_dist_to_nearest_mrt", "number_of_bus_stops", "inversed_dist_to_nearest_bus_stop", "inversed_weighted_diff_sum"))
 
 
 ## Creating a scree plot with PCA to see number of components to retain
@@ -587,28 +590,31 @@ print(variance_explained)
 pca_scores <- pca_model$ind$coord[,0:3]
 
 #PC1 score is inversely related, switch the signs 
-pca_scores_<- as.data.frame(pca_scores) %>% 
-  mutate(`Dim.1`= - `Dim.1`) %>%
-  mutate(`Dim.2` = -`Dim.2`)
+pca_scores_<- as.data.frame(pca_scores)
+#%>% 
+  #mutate(`Dim.1`=  `Dim.1`) %>%
+  #mutate(`Dim.2` = -`Dim.2`)
 
 # Convert to proportions (equate to 1). Weights are given based on the proportion of variation of value it explains. 
-weights <- c(0.602286 , 0.202268, 0.194345)  
+weights <- c(0.49373 , 0.28195, 0.22431)  
 accessibility_score <- as.matrix(pca_scores_) %*% weights  
 
 new_df <- cbind(df_normalized, accessibility_score) %>%
   dplyr::select("Street_name", "accessibility_score")
 
 accessibility_scores_final <- new_df %>%
-  mutate(across(where(is.numeric), max_min_normalize))
+  mutate(across(where(is.numeric), max_min_normalize)) %>%
+  arrange(desc(accessibility_score))
 ```
 
 #### Checking for correlation with each component, see whether it makes sense or not.
 ```{r}
 cor_w_numstations = cor(accessibility_scores_final$accessibility_score, df_final$number_of_stations, use = "complete.obs", method = "pearson")
 cor_w_numbus_stops= cor(accessibility_scores_final$accessibility_score, df_final$number_of_bus_stops, use = "complete.obs", method = "pearson")
-cor_w_mindist_stations = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_mrt, use = "complete.obs", method = "pearson")
-cor_w_mindist_bus_stops = cor(accessibility_scores_final$accessibility_score, df_final$dist_to_nearest_bus_stop, use = "complete.obs", method = "pearson")
-cor_w_mindist_time = cor(accessibility_scores_final$accessibility_score, df_final$weighted_diff_sum, use = "complete.obs", method = "pearson")
+cor_w_mindist_stations = cor(accessibility_scores_final$accessibility_score, df_final$inversed_dist_to_nearest_mrt, use = "complete.obs", method = "pearson")
+
+cor_w_mindist_bus_stops = cor(accessibility_scores_final$accessibility_score, df_final$inversed_dist_to_nearest_bus_stop, use = "complete.obs", method = "pearson")
+cor_w_mindist_time = cor(accessibility_scores_final$accessibility_score, df_final$inversed_weighted_diff_sum, use = "complete.obs", method = "pearson")
 
 
 print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindist_bus_stops,cor_w_mindist_time))
@@ -617,7 +623,7 @@ print(c(cor_w_numstations,cor_w_numbus_stops,cor_w_mindist_stations,cor_w_mindis
 
 
 ```{r}
-#write.csv(as.data.frame(accessibility_scores_final), "../Cleaned_Datasets/accessibility_scores.csv", row.names = FALSE)
+#write.csv(as.data.frame(accessibility_scores_final), "Cleaned_Datasets/accessibility_scores.csv", row.names = FALSE)
 ```
 
 ```{r}

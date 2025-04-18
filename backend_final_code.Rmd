@@ -1,6 +1,6 @@
 ---
-title: "Combined"
-author: "YH"
+title: "Final-Code"
+author: "Dora's Data Explorers"
 date: "2025-03-07"
 output: html_document
 ---
@@ -104,9 +104,9 @@ school_counts <- planning_areas %>%
 
 # API endpoint and API key
 api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
-#source("api_keys.R") 
+source("api_keys.R") 
 #api_key = Sys.getenv("lta_datamall_key")
-api_key = "8U4p6aBCRgKM0dBtLPuyQg=="
+#api_key = "8U4p6aBCRgKM0dBtLPuyQg=="
 
 # Initialize variables
 skip <- 0
@@ -156,9 +156,9 @@ all_bus_stops_cleaned <- distinct(all_bus_stops)
 #### Obtaining Tap Out for MRT Stations 
 ```{r}
 # API Key
-api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
+#api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
 #api_key <- Sys.getenv("lta_datamall_key")
-
+source("api_keys.R")
 # API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Train"
 
@@ -180,7 +180,7 @@ stations <- read_csv("Raw_datasets/stations.csv", show_col_types = FALSE) %>%
 
 # Read in downloaded CSV file
 # For each station, finding what's the total tap in and tap out for an average weekday and weekend per month
-passenger_volume_train <- read_csv(csv_file_train) %>%
+passenger_volume_train <- read_csv(csv_file_train, show_col_types = FALSE) %>%
   group_by(PT_CODE) %>%
   summarise(total_tap_in_mrt = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out_mrt = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
   ungroup()
@@ -251,9 +251,9 @@ mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "P
 #### Obtaining Tap Out rate for bus stops 
 ```{r}
 # API Key
-api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
+#api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
 #api_key = Sys.getenv("lta_datamall_key")
-
+source("api_keys.R")
 # Define API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Bus"
 
@@ -271,7 +271,7 @@ csv_file_bus <- "bus_passenger_volume.csv"  # Change path if needed
 download.file(csv_url, csv_file_bus, mode = "wb")
 
 # Load CSV into R
-bus_data <- read_csv(csv_file_bus) %>%
+bus_data <- read_csv(csv_file_bus, show_col_types = FALSE) %>%
   group_by(PT_CODE) %>%
   summarise(total_tap_in_bus = sum(TOTAL_TAP_IN_VOLUME, na.rm = TRUE), total_tap_out_bus = sum(TOTAL_TAP_OUT_VOLUME, na.rm = TRUE)) %>%
   ungroup()
@@ -668,7 +668,7 @@ final_scores <- as.data.frame(cbind(final_score, df_final)) %>%
 ## User-ranked weightages
 
 ### Checking accessibility contribution
-# choosing 3 accessible streets and 2 inaccessible streets
+# choosing 3 accessible streets (Cross Street, Jurong Gateway Road, South Buona Vista Road) and 2 inaccessible streets (Jurong West Central 2, Joo Koon Circle)
 streets_of_interest_accessibility <- c("CROSS STREET", "JURONG GATEWAY ROAD", "SOUTH BUONA VISTA ROAD", "JURONG WEST CENTRAL 2", "JOO KOON CIRCLE")
 
 results3 <- list()
@@ -711,7 +711,7 @@ ggplot(plot_data, aes(x = w3, y = rank, color = Street_name)) +
 
 ```{r}
 ### Checking rental price contribution
-# choosing 3 high rental streets and 2 low rental streets
+# choosing 3 high rental streets (Bayfront Avenue, Orchard Turn, Commonwealth Avenue West) and 2 low rental streets (SIMS Drive, Upper Cross Street)
 streets_of_interest_rental <- c("BAYFRONT AVENUE", "ORCHARD TURN", "COMMONWEALTH AVENUE WEST", "SIMS DRIVE", "UPPER CROSS STREET")
 
 results4 <- list()
@@ -752,9 +752,11 @@ ggplot(plot_data, aes(x = w4, y = rank, color = Street_name)) +
   theme_minimal()
 
 ```
+
+
 ```{r}
 ### Checking captive catchment contribution
-# choosing 3 high footfall streets and 2 low footfall streets
+# choosing 3 high footfall streets (Changi, Jurong, Paya Lebar) and 2 low footfall streets (North Bridge, River Valley)
 streets_of_interest_catchment <- c("CHANGI BUSINESS PARK CENTRAL 1", "JURONG WEST CENTRAL 3", "PAYA LEBAR ROAD", "NORTH BRIDGE ROAD", "RIVER VALLEY ROAD")
 
 results1 <- list()

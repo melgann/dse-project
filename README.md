@@ -48,12 +48,13 @@ To get the most current retail rental data:
 To get the coordinates for the newest streets 
 1. Go to `Archive\Obtaining_coords_street.ipynb`
 2. Update df_q1,df_q2,df_q3,df_q4
+ 
 `
 df_q1 = pd.read_csv("CommercialRentalStatsByStreet_YYYYMMDDHHMMSS.csv")  
 `
 
-3. Replace the `Bearer` to your own token by signing up to [OneMapApi](https://www.onemap.gov.sg/apidocs/register)
-4. Execute cells 1-10 to obtain to new csv with the corresponding Planning Areas and Coordinates of the new obtained Streets 
+4. Replace the `Bearer` to your own token by signing up to [OneMapApi](https://www.onemap.gov.sg/apidocs/register)
+5. Execute cells 1-11 to obtain to new csv with the corresponding Planning Areas and Coordinates of the newly obtained Streets 
 
 ##### Obtaining Passenger Volumes of Bus and MRT Stations
 1. Go to `update_captive_catchment.R` and click run to obtain the updated Passenger Volumes of Bus and Stations to form a new Captive Catchment Score. 

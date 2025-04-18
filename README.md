@@ -21,7 +21,7 @@ source("api_keys.R")
 
 ---
 
-## 🖥️ Running the App
+## 🖥️ Running the Shiny App
 
 ### Step 1: Clone the GitHub Repository
 
@@ -29,10 +29,18 @@ source("api_keys.R")
 git clone https://github.com/melgann/dse-project.git 
 cd dse-project 
 ```
-## ⌨️ Data Preparation
 
-To ensure the app generates the most up-to-date scores, download the latest dataset and place it in the designated folder. Follow these steps:
+---
 
+## 🗃️ Data Preparation
+
+Follow these steps to ensure the app generates the most up-to-date scores.
+
+---
+
+### ✅ Step 1: Install All Dependencies
+
+Ensure all R and Python packages listed above are installed locally.
 #### R Package Requirements
 
 ```r
@@ -48,22 +56,6 @@ install.packages(c(
 ```bash
 pip install pandas geopandas
 ```
-
-### Step 3: Run the Shiny App
-
-Open the project in RStudio and run the Shiny app as directed.
-
----
-
-## 🗃️ Data Preparation
-
-Follow these steps to ensure the app generates the most up-to-date scores.
-
----
-
-### ✅ Step 1: Install All Dependencies
-
-Ensure all R and Python packages listed above are installed locally.
 
 ---
 

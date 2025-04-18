@@ -2,6 +2,9 @@
 
 ## Set Up Instructions
 
+### Configuration
+The API key for the LTA DataMall dataset should be stored in a local R script called api_keys.R where there is only one variable api_key = "your_key_here". Please create such an R script to store your own API key which will be referenced in the code where there is 'source("api_keys.R")'
+
 ### Running App 
 Step 1: Clone Github Repository 
 ```bash
@@ -65,8 +68,6 @@ df_q1 = pd.read_csv("CommercialRentalStatsByStreet_YYYYMMDDHHMMSS.csv")
 **Step 3**: Go to `backend_final_code.Rmd` and click `Run all` under `Run` to obtain the latest final scores with the updated datasets!
 
 
-## API key storage
-The API key for the LTA DataMall dataset should be stored in a local R script called api_keys.R where there is only one variable api_key = "your_key_here". Please create such an R script to store your own API key which will be referenced in the code where there is 'source("api_keys.R")'
 
 
 

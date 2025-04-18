@@ -1,4 +1,4 @@
-![](www/logo.png)
+#StreetSwiper
 
 ## Set Up Instructions
 

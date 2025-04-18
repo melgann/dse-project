@@ -1,71 +1,110 @@
 # StreetSwiper
 
-## Set Up Instructions
 
-### Configuration
-The API key for the LTA DataMall dataset should be stored in a local R script called api_keys.R where there is only one variable api_key = "your_key_here". Please create such an R script to store your own API key which will be referenced in the code where there is 'source("api_keys.R")'
+# 🚀 Set-Up Instructions
 
-### Running App 
-Step 1: Clone Github Repository 
+---
+
+## 🔧 Configuration
+
+Store your LTA DataMall API key in a local R script named `api_keys.R`:
+
+```r
+api_key = "your_key_here"
+```
+
+This script is referenced in the code with:
+
+```r
+source("api_keys.R")
+```
+
+---
+
+## 🖥️ Running the App
+
+### Step 1: Clone the GitHub Repository
+
 ```bash
 git clone https://github.com/melgann/dse-project.git 
 cd dse-project 
 ```
 
-Step 2: Install Necessary Packages to run Shiny App 
+### Step 2: Install Required Packages
 
-Step 3: Run App 
-
-
-### Data Preparation
-
-To ensure the app generates the most up-to-date scores, download the latest dataset and place it in the designated folder. Follow these steps:
-
-**Step 1**: Ensure that the following Dependencies are installed in your local. 
-
-##### R Package Requirements
+#### R Package Requirements
 
 ```r
 install.packages(c(
-  "tidyverse","dplyr","data.table","jsonlite","sf","geosphere","dynlm","httr", 
-  "rvest","fuzzyjoin","FactoMineR","factoextra", "readr", "readxl", "stringr", "lubridate"      
+  "tidyverse", "dplyr", "data.table", "jsonlite", "sf", "geosphere",
+  "dynlm", "httr", "rvest", "fuzzyjoin", "FactoMineR", "factoextra",
+  "readr", "readxl", "stringr", "lubridate"
 ))
-
 ```
 
-##### Python Package Requirements 
+#### Python Package Requirements
+
 ```bash
 pip install pandas geopandas
-````
-**Step 2**: Download the Relevant Datasets 
+```
 
-##### Rental Prices 
-To get the most current retail rental data:
+### Step 3: Run the Shiny App
+
+Open the project in RStudio and run the Shiny app as directed.
+
+---
+
+## 🗃️ Data Preparation
+
+Follow these steps to ensure the app generates the most up-to-date scores.
+
+---
+
+### ✅ Step 1: Install All Dependencies
+
+Ensure all R and Python packages listed above are installed locally.
+
+---
+
+### 📥 Step 2: Download Relevant Datasets
+
+#### 🏢 Rental Prices
+
 1. Visit the [URA Retail Rental Analysis portal](https://eservice.ura.gov.sg/property-market-information/pmiCommercialRentalRetailAnalysis)
-2. Select **"Retail"** under Commercial Rental Analysis
+2. Select **"Retail"** under *Commercial Rental Analysis*
 3. Choose the latest available quarter(s) for the current year
 4. Download the dataset in CSV format
-5. Save the file to `Raw_datasets`
+5. Save the file to the `Raw_datasets` folder
 
-##### Obtaining Coordinates for New Streets 
-To get the coordinates for the newest streets 
-1. Go to `Archive\Obtaining_coords_street.ipynb`
-2. Update df_q1,df_q2,df_q3,df_q4
- 
-`
-df_q1 = pd.read_csv("CommercialRentalStatsByStreet_YYYYMMDDHHMMSS.csv")  
-`
+---
 
-4. Replace the `Bearer` to your own token by signing up to [OneMapApi](https://www.onemap.gov.sg/apidocs/register)
-5. Execute cells 1-11 to obtain to new csv with the corresponding Planning Areas and Coordinates of the newly obtained Streets  
+#### 🗺️ Coordinates for New Streets
 
-##### Public and Private Transport Timings 
-1. Go to `Archive\Obtaining_coords_street.ipynb`
-2. Replace the `Bearer` to your own token by signing up to [OneMapApi](https://www.onemap.gov.sg/apidocs/register) 
-3.  Run code chunk 11 to the end of the file to obtain Public and Private Transport Timings of New Streets 
+1. Go to `Archive/Obtaining_coords_street.ipynb`
+2. Update the DataFrames such as:
 
+```python
+df_q1 = pd.read_csv("CommercialRentalStatsByStreet_YYYYMMDDHHMMSS.csv")
+```
 
-**Step 3**: Go to `backend_final_code.Rmd` and click `Run all` under `Run` to obtain the latest final scores with the updated datasets!
+3. Replace the `Bearer` token with your own, available from [OneMap API](https://www.onemap.gov.sg/apidocs/register)
+4. Execute cells 1–11 to generate a new CSV with Planning Areas and Coordinates of the new streets
+
+---
+
+#### 🚉 Public and Private Transport Timings
+
+1. In the same notebook `Archive/Obtaining_coords_street.ipynb`
+2. Replace the `Bearer` token with your OneMap API token
+3. Run code chunks 11 to the end to obtain Public and Private Transport Timings of new streets
+
+---
+
+### 🧮 Step 3: Generate Final Scores
+
+1. Open `backend_final_code.Rmd`
+2. Click `Run all` under the **Run** menu
+3. This will generate the latest final scores with the updated datasets
 
 
 ## 🧪 Methodology

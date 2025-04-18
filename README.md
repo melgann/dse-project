@@ -1,4 +1,4 @@
-!(www/logo.png)
+![](www/logo.png)
 
 ## Set Up Instructions
 

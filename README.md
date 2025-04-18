@@ -68,6 +68,68 @@ df_q1 = pd.read_csv("CommercialRentalStatsByStreet_YYYYMMDDHHMMSS.csv")
 **Step 3**: Go to `backend_final_code.Rmd` and click `Run all` under `Run` to obtain the latest final scores with the updated datasets!
 
 
+## 🧪 Methodology
+
+### Objective  
+To rank Singapore streets by retail potential based on accessibility, footfall, proximity to malls, and rental price. Scores are computed using derived geospatial and demographic variables.
+
+---
+
+### (A) Feature Engineering
+
+#### 1. Distance to Nearest Mall  
+- Datasets: Street Coordinates (3), Shopping Malls (1)  
+- Used `distHaversine` to find nearest mall for each street.
+
+#### 2. Rental Price  
+- Dataset: Rental Prices (2)  
+- No transformation applied.
+
+#### 3. Captive Catchment Score  
+- **Population**: Mapped street to planning area using spatial join.  
+- **Schools**: Counted schools per planning area using `st_contains`.  
+- **MRT Volume**: Found nearest MRT; computed weighted volume = (1/dist) × volume.  
+- **Bus Volume**: Same method as MRT.
+
+#### 4. Accessibility Score  
+- **Inverted Distances**: 1 / distance to nearest MRT & bus stop.  
+- **MRT/Bus Count**: Counted stations within 500m / 250m.  
+- **Travel Time Diff**: Weighted public–private travel time diff using population, then inverted.
+
+---
+
+### (B) Modelling
+
+#### Assumptions  
+- One vacant retail unit per street.  
+- Distances are straight-line.  
+- Linear relationships assumed.  
+
+#### Scoring Formula  
+
+#### PCA & Normalization  
+- Applied PCA on catchment and accessibility variables.  
+- Kept top 3 components (>98.9% and >79.8% variance explained).  
+- Weighted sums normalized using min-max scaling.
+
+#### Weights  
+- **Default**: Based on survey % importance.  
+- **Custom**: Based on user rank (1–10), normalized to sum to 1.
+
+---
+
+### (C) Evaluation
+
+#### Why Not Traditional Metrics  
+- No ground truth (e.g., store revenue), so accuracy metrics not applicable.
+
+#### Sensitivity Analysis  
+- Varying one weight (e.g., accessibility or rental) showed logical shifts in rankings.  
+- Confirms the model responds meaningfully to priority changes.
+
+![Figure: Accessibility Sensitivity](www/accessibility_sensibility.png)
+
+We varied the Accessibility weight (w₃) from 2 to 10 while keeping all other weights fixed at 2. As w₃ increased, the ranks of more accessible streets (Cross Street, Jurong Gateway Rd, South Buona Vista Rd) rose, while those of less accessible streets (Jurong West Central 2, Joo Koon Circle) declined. This confirms that the model reacts intuitively to changing priorities.
 
 
 

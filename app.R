@@ -765,7 +765,9 @@ server <- function(input, output, session) {
                           input$captiveCatchmentWeight,
                           input$distToMallWeight)
       
-      normalized_weights <- max_min_normalize(custom_weights)
+      # Normalize so weights sum to 1
+      normalized_weights <- custom_weights / sum(custom_weights, na.rm = TRUE)
+      
     } else {
       normalized_weights <- normalized_default_weights
     }

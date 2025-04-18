@@ -29,8 +29,9 @@ source("api_keys.R")
 git clone https://github.com/melgann/dse-project.git 
 cd dse-project 
 ```
+## ⌨️ Data Preparation
 
-### Step 2: Install Required Packages
+To ensure the app generates the most up-to-date scores, download the latest dataset and place it in the designated folder. Follow these steps:
 
 #### R Package Requirements
 

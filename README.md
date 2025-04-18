@@ -88,8 +88,10 @@ To rank Singapore streets by retail potential based on accessibility, footfall, 
 - **Bus Volume**: Same method as MRT.
 
 #### 4. Accessibility Score  
-- **Inverted Distances**: 1 / distance to nearest MRT & bus stop.  
-- **MRT/Bus Count**: Counted stations within 500m / 250m.  
+- **Inverted Distances of MRT**: 1 / distance to nearest MRT
+-   **Inverted Distances of bus**: 1 / distance to nearest bus stop
+- **MRT Count**: Counted stations within 250m.
+- **Bus Count**: Counted bus stops within 250m
 - **Travel Time Diff**: Weighted public–private travel time diff using population, then inverted.
 
 ---
@@ -98,14 +100,14 @@ To rank Singapore streets by retail potential based on accessibility, footfall, 
 
 #### Assumptions  
 - One vacant retail unit per street.  
-- Distances are straight-line.  
-- Linear relationships assumed.  
+- Distances are straight-line (using Haversine).  
+- Relationships among variables are linear — the variation in the data can be captured using straight-line (linear) combinations of the variables
 
 #### Scoring Formula  
 
 #### PCA & Normalization  
 - Applied PCA on catchment and accessibility variables.  
-- Kept top 3 components (>98.9% and >79.8% variance explained).  
+- Kept top 3 components (>98.9% for Captive Catchment Score and >79.8% variance explained for Accessibility Score).  
 - Weighted sums normalized using min-max scaling.
 
 #### Weights  

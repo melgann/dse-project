@@ -663,3 +663,137 @@ final_scores <- as.data.frame(cbind(final_score, df_final)) %>%
 ```
 
 
+## 8. Testing Our Model
+```{r}
+## User-ranked weightages
+
+### Checking accessibility contribution
+# choosing 3 accessible streets and 2 inaccessible streets
+streets_of_interest_accessibility <- c("CROSS STREET", "JURONG GATEWAY ROAD", "SOUTH BUONA VISTA ROAD", "JURONG WEST CENTRAL 2", "JOO KOON CIRCLE")
+
+results3 <- list()
+
+# Loop over w3 from 2 to 10
+for (i in 2:10) {
+  w1 <- 2/(6+i)
+  w2 <- 2/(6+i)
+  w3 <- i/(6+i)
+  w4 <- 2/(6+1)
+  
+  df_user_scores <- df_select %>%
+    mutate(
+      shop_score = w1*captive_catchment - w2*dist_to_nearest_mall + w3*accessibility_score - w4*avg_median_price, .after=Street_name
+    ) %>%
+    arrange(desc(shop_score)) %>%
+    mutate(rank = row_number()) %>%
+    filter(Street_name %in% streets_of_interest_accessibility) %>%
+    select(Street_name, rank) %>%
+    mutate(w3 = w3)
+  
+  results3[[as.character(w3)]] <- df_user_scores
+}
+
+# Combine into one data frame
+plot_data <- bind_rows(results3)
+
+# Plot: Rank vs w3 for each selected street
+ggplot(plot_data, aes(x = w3, y = rank, color = Street_name)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_y_reverse(breaks = scales::pretty_breaks()) +  # Lower rank = higher score
+  labs(
+    title = "Change in Rank of Selected Streets as Accessibility Weight (w3) Varies",
+    x = "w3 (Accessibility Weight)",
+    y = "Rank"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+### Checking rental price contribution
+# choosing 3 high rental streets and 2 low rental streets
+streets_of_interest_rental <- c("BAYFRONT AVENUE", "ORCHARD TURN", "COMMONWEALTH AVENUE WEST", "SIMS DRIVE", "UPPER CROSS STREET")
+
+results4 <- list()
+
+# Loop over w4 from 2 to 10
+for (i in 2:10) {
+  w1 <- 2/(6+i)
+  w2 <- 2/(6+i)
+  w3 <- 2/(6+i)
+  w4 <- i/(6+1)
+  
+  df_user_scores <- df_select %>%
+    mutate(
+      shop_score = w1*captive_catchment - w2*dist_to_nearest_mall + w3*accessibility_score - w4*avg_median_price, .after=Street_name
+    ) %>%
+    arrange(desc(shop_score)) %>%
+    mutate(rank = row_number()) %>%
+    filter(Street_name %in% streets_of_interest_rental) %>%
+    select(Street_name, rank) %>%
+    mutate(w4 = w4)
+  
+  results4[[as.character(w4)]] <- df_user_scores
+}
+
+# Combine into one data frame
+plot_data <- bind_rows(results4)
+
+# Plot: Rank vs w3 for each selected street
+ggplot(plot_data, aes(x = w4, y = rank, color = Street_name)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_y_reverse(breaks = scales::pretty_breaks()) +  # Lower rank = higher score
+  labs(
+    title = "Change in Rank of Selected Streets as Rental Price Weight (w4) Varies",
+    x = "w4 (Rental Price Weight)",
+    y = "Rank"
+  ) +
+  theme_minimal()
+
+```
+```{r}
+### Checking captive catchment contribution
+# choosing 3 high footfall streets and 2 low footfall streets
+streets_of_interest_catchment <- c("CHANGI BUSINESS PARK CENTRAL 1", "JURONG WEST CENTRAL 3", "PAYA LEBAR ROAD", "NORTH BRIDGE ROAD", "RIVER VALLEY ROAD")
+
+results1 <- list()
+
+# Loop over w1 from 2 to 10
+for (i in 2:10) {
+  w1 <- i/(6+i)
+  w2 <- 2/(6+i)
+  w3 <- 2/(6+i)
+  w4 <- 2/(6+1)
+  
+  df_user_scores <- df_select %>%
+    mutate(
+      shop_score = w1*captive_catchment - w2*dist_to_nearest_mall + w3*accessibility_score - w4*avg_median_price, .after=Street_name
+    ) %>%
+    arrange(desc(shop_score)) %>%
+    mutate(rank = row_number()) %>%
+    filter(Street_name %in% streets_of_interest_catchment) %>%
+    select(Street_name, rank) %>%
+    mutate(w1 = w1)
+  
+  results1[[as.character(w1)]] <- df_user_scores
+}
+
+# Combine into one data frame
+plot_data <- bind_rows(results1)
+
+# Plot: Rank vs w3 for each selected street
+ggplot(plot_data, aes(x = w1, y = rank, color = Street_name)) +
+  geom_line(size = 1) +
+  geom_point(size = 2) +
+  scale_y_reverse(breaks = scales::pretty_breaks()) +  # Lower rank = higher score
+  labs(
+    title = "Change in Rank of Selected Streets as Captive Catchment Weight (w1) Varies",
+    x = "w1 (Captive Catchment Weight)",
+    y = "Rank"
+  ) +
+  theme_minimal()
+
+```
+
+

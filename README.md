@@ -78,12 +78,8 @@ To rank Singapore streets by retail potential based on accessibility, footfall, 
 ### (A) Feature Engineering
 
 #### 1. Distance to Nearest Mall  
-- Datasets: Street Coordinates (3), Shopping Malls (1)  
-- Used `distHaversine` to find nearest mall for each street.
 
 #### 2. Rental Price  
-- Dataset: Rental Prices (2)  
-- No transformation applied.
 
 #### 3. Captive Catchment Score  
 - **Population**: Mapped street to planning area using spatial join.  

@@ -87,7 +87,7 @@ street_bus <- read.csv("Cleaned_Datasets/number_of_bus_stops_near_street.csv") %
          `Bus Stop Count` = number_of_bus_stops)
 
   # 4.6 Public VS Private Transport Travelling Time
-  # !!! to combine data set -- why are there different number of rows?
+  # !!! to combine data set -- why are there different number of rows
 public_transport_timing <- read.csv("Cleaned_Datasets/drive_timing.csv") %>%
   select(Street = Street_name,
          `Origin (Planning Area)` = Planning_area,

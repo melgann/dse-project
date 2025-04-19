@@ -105,8 +105,6 @@ school_counts <- planning_areas %>%
 # API endpoint and API key
 api_url <- "http://datamall2.mytransport.sg/ltaodataservice/BusStops"
 source("api_keys.R") 
-#api_key = Sys.getenv("lta_datamall_key")
-#api_key = "8U4p6aBCRgKM0dBtLPuyQg=="
 
 # Initialize variables
 skip <- 0
@@ -156,8 +154,6 @@ all_bus_stops_cleaned <- distinct(all_bus_stops)
 #### Obtaining Tap Out for MRT Stations 
 ```{r}
 # API Key
-#api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
-#api_key <- Sys.getenv("lta_datamall_key")
 source("api_keys.R")
 # API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Train"
@@ -241,6 +237,7 @@ expanded_df <- df_train %>%
   distinct()
 
 # weights = 1/distance 
+# we use these weights to penalise mrt stations that may have more tap-out volume but are actually further away from the street
 # create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
 mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "PT_CODE")) %>%
   dplyr::select(-c("station_code", "station_pattern")) %>%
@@ -251,8 +248,6 @@ mrt_code_cood_dist <- left_join(dist_mrt, expanded_df, by = c("StationCode" = "P
 #### Obtaining Tap Out rate for bus stops 
 ```{r}
 # API Key
-#api_key <- "8U4p6aBCRgKM0dBtLPuyQg=="
-#api_key = Sys.getenv("lta_datamall_key")
 source("api_keys.R")
 # Define API Endpoint
 url <- "http://datamall2.mytransport.sg/ltaodataservice/PV/Bus"
@@ -321,6 +316,7 @@ dist_bus <- results_df_bus %>%
 
 
 # weights = 1/distance
+# we use these weights to penalise bus stops that may have more tap-out volume but are actually further away from the street
 # create a new variable called dist_weighted_PV_bus that is a measure of Captive Catchment
 bus_code_cood_dist <- left_join(dist_bus, bus_code_cood, by = c("BusStopCode" = "PT_CODE")) %>%
   dplyr::select(-c("RoadName", "Description")) %>%
@@ -464,7 +460,7 @@ df_all_combis_drive_timing = df_all_combis_drive_timing %>%
 df_all_combis_pt_timing = read.csv("Cleaned_Datasets/final_public_transport_to_streets_from_planning_area.csv")%>%
   mutate(Planning_area = toupper(Planning_area))
 
-#diff between pt and drive
+#Finding the diff between pt and drive
 df_drive_timing = df_all_combis_drive_timing %>%
   dplyr::select(1,2,4)
 
@@ -589,11 +585,8 @@ print(variance_explained)
 #Inspect Individual scores for each PC component 
 pca_scores <- pca_model$ind$coord[,0:3]
 
-#PC1 score is inversely related, switch the signs 
+#Create a dataframe called pca_scores_
 pca_scores_<- as.data.frame(pca_scores)
-#%>% 
-  #mutate(`Dim.1`=  `Dim.1`) %>%
-  #mutate(`Dim.2` = -`Dim.2`)
 
 # Convert to proportions (equate to 1). Weights are given based on the proportion of variation of value it explains. 
 weights <- c(0.49373 , 0.28195, 0.22431)  
@@ -603,8 +596,8 @@ new_df <- cbind(df_normalized, accessibility_score) %>%
   dplyr::select("Street_name", "accessibility_score")
 
 accessibility_scores_final <- new_df %>%
-  mutate(across(where(is.numeric), max_min_normalize)) %>%
-  arrange(desc(accessibility_score))
+  mutate(across(where(is.numeric), max_min_normalize)) 
+
 ```
 
 #### Checking for correlation with each component, see whether it makes sense or not.

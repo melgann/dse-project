@@ -30,6 +30,9 @@ git clone https://github.com/melgann/dse-project.git
 cd dse-project 
 ```
 
+### Step 2: Run the app
+Open to `app.R`and click `Run App`
+
 ---
 
 ## 🗃️ Data Preparation
